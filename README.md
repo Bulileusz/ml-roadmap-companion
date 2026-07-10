@@ -20,28 +20,29 @@ pierwszym uruchomieniu.
 
 - **Moduł 1 (gotowy)** — tracker postępu przez fazy roadmapy (0, 1, 2,
   2b, 3, 4): edytowalne taski, checkboxy, notatki, paski postępu.
-- **Moduł 2 (planowany)** — fiszki / spaced repetition do pojęć ML.
+- **Moduł 2 (gotowy)** — fiszki / spaced repetition do pojęć ML (system
+  Leitnera, 5 pudełek): widok dzisiejszych powtórek, dodawanie/edycja/
+  usuwanie fiszek z UI.
 - **Moduł 3 (planowany)** — bank pytań sprawdzających zrozumienie.
 
 ## Architektura
 
 ```
-app.py            entry point (streamlit run app.py)
-db/               połączenie SQLite, schema, dane startowe (seed)
-repository/       CRUD na tabelach (phases, tasks)
-services/         logika biznesowa (liczenie postępu)
+app.py            strona "Roadmap" (streamlit run app.py)
+pages/             kolejne strony multipage (np. Fiszki)
+db/               połączenie SQLite, schema, dane startowe (seed), bootstrap
+repository/       CRUD na tabelach (phases, tasks, flashcards)
+services/         logika biznesowa (postęp, spaced repetition)
 ui/               funkcje renderujące widgety Streamlit
 data/             plik roadmap.db (nieśledzony w git)
 ```
 
-**Decyzja architektoniczna:** na razie nie używamy Streamlit multipage
-(`pages/`), bo jest tylko jeden moduł. Cała logika biznesowa siedzi
-w `db/`, `repository/`, `services/`, `ui/components.py`, a `app.py` jest
-tylko cienkim plikiem spinającym — gdy dojdzie Moduł 2, przejście na
-multipage sprowadzi się do przeniesienia zawartości `app.py` do
-`pages/1_Roadmap.py` i dodania `pages/2_Fiszki.py`, bez przepisywania
-logiki.
+**Decyzja architektoniczna:** apka używa natywnego Streamlit multipage —
+`app.py` to strona startowa ("Roadmap"), kolejne moduły dochodzą jako
+pliki w `pages/`. Współdzielone połączenie z bazą (`init_app()`, cache
+`st.cache_resource`) siedzi w `db/bootstrap.py`, żeby każda strona mogła
+z niego korzystać bez duplikowania inicjalizacji.
 
-Baza `phases`/`tasks` jest zaprojektowana tak, by Moduł 2/3 mogły dodać
-nowe tabele (np. `flashcards`, `questions`) referencujące te dwie, bez
-zmian w istniejącym schemacie.
+Baza `phases`/`tasks` jest jedynym stałym punktem odniesienia — Moduł 2/3
+dodają nowe tabele (np. `flashcards`, `questions`) z nullable FK i
+`ON DELETE SET NULL`, bez zmian w istniejącym schemacie.

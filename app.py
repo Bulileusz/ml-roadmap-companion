@@ -1,21 +1,8 @@
-import sqlite3
-
 import streamlit as st
 
-from db.connection import get_connection
-from db.schema import init_db
-from db.seed_data import seed_if_empty
+from db.bootstrap import init_app
 from services import progress
 from ui.components import render_progress_bar, render_phase_section
-
-
-@st.cache_resource
-def init_app() -> sqlite3.Connection:
-    conn = get_connection()
-    init_db(conn)
-    seed_if_empty(conn)
-    return conn
-
 
 st.set_page_config(page_title="ML Roadmap Companion", page_icon="🗺️", layout="wide")
 st.title("🗺️ ML Roadmap Companion")
