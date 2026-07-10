@@ -23,19 +23,31 @@ pierwszym uruchomieniu.
 - **Moduł 2 (gotowy)** — fiszki / spaced repetition do pojęć ML (system
   Leitnera, 5 pudełek): widok dzisiejszych powtórek, dodawanie/edycja/
   usuwanie fiszek z UI.
-- **Moduł 3 (planowany)** — bank pytań sprawdzających zrozumienie.
+- **Moduł 3 (gotowy)** — bank pytań sprawdzających zrozumienie, per faza:
+  oznaczanie "rozwiązałem samodzielnie" / "musiałem sprawdzić", pełny log
+  dat podejść (`question_attempts`) i prosty wskaźnik trendu (% samodzielnie
+  na wszystkich podejściach).
 
 ## Architektura
 
 ```
 app.py            strona "Roadmap" (streamlit run app.py)
-pages/             kolejne strony multipage (np. Fiszki)
+pages/             kolejne strony multipage (Fiszki, Pytania)
 db/               połączenie SQLite, schema, dane startowe (seed), bootstrap
-repository/       CRUD na tabelach (phases, tasks, flashcards)
-services/         logika biznesowa (postęp, spaced repetition)
+repository/       CRUD na tabelach (phases, tasks, flashcards, questions, question_attempts)
+services/         logika biznesowa (postęp, spaced repetition, statystyki pytań)
 ui/               funkcje renderujące widgety Streamlit
 data/             plik roadmap.db (nieśledzony w git)
 ```
+
+**Wzorzec kluczy obcych między modułami:** rozróżniamy dwa typy relacji.
+Cross-module, opcjonalny link do Modułu 1 (np. `flashcards.phase_id`,
+`questions.phase_id`) jest nullable z `ON DELETE SET NULL` — usunięcie
+fazy/taska nie kasuje danych innego modułu, tylko je odpina. Intra-module,
+właścicielska relacja rodzic-dziecko (np. `question_attempts.question_id`,
+podobnie jak `tasks.phase_id -> phases`) jest `NOT NULL` z
+`ON DELETE CASCADE` — usunięcie rodzica to świadoma decyzja skasowania
+całego jego zakresu, więc dzieci znikają razem z nim.
 
 **Decyzja architektoniczna:** apka używa natywnego Streamlit multipage —
 `app.py` to strona startowa ("Roadmap"), kolejne moduły dochodzą jako

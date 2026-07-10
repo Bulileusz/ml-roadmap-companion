@@ -49,6 +49,38 @@ _CREATE_FLASHCARDS_INDEX = """
 CREATE INDEX IF NOT EXISTS idx_flashcards_next_review ON flashcards(next_review_at);
 """
 
+# questions.phase_id: cross-module, opcjonalny link do Modułu 1 - nullable +
+# ON DELETE SET NULL (usunięcie fazy nie kasuje pytania, tylko je odpina).
+_CREATE_QUESTIONS = """
+CREATE TABLE IF NOT EXISTS questions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    phase_id       INTEGER REFERENCES phases(id) ON DELETE SET NULL,
+    question_text  TEXT NOT NULL,
+    question_type  TEXT NOT NULL DEFAULT 'concept' CHECK (question_type IN ('concept', 'code')),
+    created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+"""
+
+_CREATE_QUESTIONS_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_questions_phase_id ON questions(phase_id);
+"""
+
+# question_attempts.question_id: intra-module, właścicielska relacja
+# rodzic-dziecko (log podejść nie ma sensu bez pytania) - NOT NULL +
+# ON DELETE CASCADE, tak jak tasks.phase_id -> phases w Module 1.
+_CREATE_QUESTION_ATTEMPTS = """
+CREATE TABLE IF NOT EXISTS question_attempts (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id           INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    attempted_at          TEXT NOT NULL DEFAULT (datetime('now')),
+    solved_independently  INTEGER NOT NULL CHECK (solved_independently IN (0, 1))
+);
+"""
+
+_CREATE_QUESTION_ATTEMPTS_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_question_attempts_question_id ON question_attempts(question_id);
+"""
+
 
 def init_db(conn: sqlite3.Connection) -> None:
     conn.execute(_CREATE_PHASES)
@@ -56,4 +88,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.execute(_CREATE_TASKS_INDEX)
     conn.execute(_CREATE_FLASHCARDS)
     conn.execute(_CREATE_FLASHCARDS_INDEX)
+    conn.execute(_CREATE_QUESTIONS)
+    conn.execute(_CREATE_QUESTIONS_INDEX)
+    conn.execute(_CREATE_QUESTION_ATTEMPTS)
+    conn.execute(_CREATE_QUESTION_ATTEMPTS_INDEX)
     conn.commit()
