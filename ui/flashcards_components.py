@@ -8,7 +8,7 @@ from services import spaced_repetition
 
 def render_due_today_section(conn: sqlite3.Connection) -> None:
     st.subheader("Dzisiejsze powtórki")
-    due = flashcards_repo.list_due_today(conn)
+    due = spaced_repetition.get_due_cards(conn)
 
     if not due:
         st.success("Brak powtórek na dziś! 🎉")
@@ -38,29 +38,61 @@ def render_due_today_section(conn: sqlite3.Connection) -> None:
             st.rerun()
 
 
+def _on_add_flashcard(conn: sqlite3.Connection, phase_options: dict) -> None:
+    # Celowo bez st.form: pola formularzy trzymają lokalny stan we froncie
+    # i nie da się ich niezawodnie wyczyścić z session_state. Zwykły widget
+    # + czyszczenie klucza w callbacku przycisku działa przewidywalnie.
+    front = st.session_state.get("add_card_front", "").strip()
+    back = st.session_state.get("add_card_back", "").strip()
+    if front and back:
+        phase_label = st.session_state.get("add_card_phase", "— brak —")
+        spaced_repetition.create_card(conn, front, back, phase_options[phase_label])
+        st.session_state["add_card_front"] = ""
+        st.session_state["add_card_back"] = ""
+        st.session_state.pop("add_card_error", None)
+    elif not front:
+        st.session_state["add_card_error"] = "Przód fiszki nie może być pusty."
+    else:
+        st.session_state["add_card_error"] = "Tył fiszki nie może być pusty."
+
+
 def render_add_flashcard_form(conn: sqlite3.Connection, phases: list[sqlite3.Row]) -> None:
-    with st.form("add_flashcard_form", clear_on_submit=True):
-        front = st.text_input("Przód (pytanie/termin)")
-        back = st.text_area("Tył (odpowiedź/definicja)", height=100)
+    phase_options = {"— brak —": None}
+    for phase in phases:
+        phase_options[phase["name"]] = phase["id"]
 
-        phase_options = {"— brak —": None}
-        for phase in phases:
-            phase_options[phase["name"]] = phase["id"]
-        phase_label = st.selectbox("Faza (opcjonalnie)", list(phase_options.keys()))
+    with st.container(border=True):
+        st.text_input("Przód (pytanie/termin)", key="add_card_front")
+        st.text_area("Tył (odpowiedź/definicja)", height=100, key="add_card_back")
+        st.selectbox(
+            "Faza (opcjonalnie)", list(phase_options.keys()), key="add_card_phase"
+        )
+        st.button(
+            "Dodaj fiszkę",
+            key="add_card_submit",
+            on_click=_on_add_flashcard,
+            args=(conn, phase_options),
+        )
+        error = st.session_state.get("add_card_error")
+        if error:
+            st.error(error)
 
-        submitted = st.form_submit_button("Dodaj fiszkę")
-        if submitted and front.strip() and back.strip():
-            flashcards_repo.create(
-                conn, front.strip(), back.strip(), phase_options[phase_label]
-            )
-            st.rerun()
 
-
-def _on_content_change(conn: sqlite3.Connection, card_id: int) -> None:
-    front = st.session_state[f"front_{card_id}"].strip()
-    back = st.session_state[f"back_{card_id}"].strip()
+def _on_content_change(
+    conn: sqlite3.Connection, card_id: int, prev_front: str, prev_back: str
+) -> None:
+    front_key = f"front_{card_id}"
+    back_key = f"back_{card_id}"
+    front = st.session_state[front_key].strip()
+    back = st.session_state[back_key].strip()
     if front and back:
         flashcards_repo.update_content(conn, card_id, front, back)
+    else:
+        # Przywracamy oba pola do stanu z bazy - przywrócenie tylko jednego
+        # zostawiłoby drugie widocznie rozjechane z zapisanymi danymi.
+        st.session_state[front_key] = prev_front
+        st.session_state[back_key] = prev_back
+        st.toast("Przód i tył fiszki nie mogą być puste", icon="⚠️")
 
 
 def render_flashcard_edit_row(conn: sqlite3.Connection, card: sqlite3.Row) -> None:
@@ -75,7 +107,7 @@ def render_flashcard_edit_row(conn: sqlite3.Connection, card: sqlite3.Row) -> No
             value=card["front"],
             key=f"front_{card_id}",
             on_change=_on_content_change,
-            args=(conn, card_id),
+            args=(conn, card_id, card["front"], card["back"]),
             label_visibility="collapsed",
         )
     with col_back:
@@ -84,7 +116,7 @@ def render_flashcard_edit_row(conn: sqlite3.Connection, card: sqlite3.Row) -> No
             value=card["back"],
             key=f"back_{card_id}",
             on_change=_on_content_change,
-            args=(conn, card_id),
+            args=(conn, card_id, card["front"], card["back"]),
             label_visibility="collapsed",
         )
     with col_delete:
@@ -102,7 +134,10 @@ def render_flashcard_edit_row(conn: sqlite3.Connection, card: sqlite3.Row) -> No
                 st.session_state[confirm_key] = True
                 st.rerun()
 
-    st.caption(f"Pudełko {card['box']}/5 • następna powtórka: {card['next_review_at']}")
+    st.caption(
+        f"Pudełko {card['box']}/{spaced_repetition.MAX_BOX} "
+        f"• następna powtórka: {card['next_review_at']}"
+    )
     st.divider()
 
 

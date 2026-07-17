@@ -12,7 +12,7 @@ conn = init_app()
 overall = progress.get_overall_progress(conn)
 render_progress_bar(
     overall["pct"],
-    f"Postęp całości: {overall['done']}/{overall['total']} zadań ({overall['pct']:.0f}%)",
+    f"Postęp całości: {overall['done']}/{overall['total']} zadań ({int(overall['pct'])}%)",
 )
 
 st.divider()
@@ -24,4 +24,4 @@ first_incomplete_id = next(
 
 for entry in phase_progress:
     phase = entry["phase"]
-    render_phase_section(conn, phase, expanded=(phase["id"] == first_incomplete_id))
+    render_phase_section(conn, entry, expanded=(phase["id"] == first_incomplete_id))

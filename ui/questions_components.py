@@ -39,11 +39,11 @@ def render_question_row(conn: sqlite3.Connection, question: sqlite3.Row) -> None
     col_solo, col_checked, col_summary = st.columns([0.3, 0.35, 0.35])
     with col_solo:
         if st.button("✅ Rozwiązałem samodzielnie", key=f"solo_{question_id}"):
-            question_attempts_repo.create_attempt(conn, question_id, True)
+            question_attempts_repo.create(conn, question_id, True)
             st.rerun()
     with col_checked:
         if st.button("📖 Musiałem sprawdzić rozwiązanie", key=f"checked_{question_id}"):
-            question_attempts_repo.create_attempt(conn, question_id, False)
+            question_attempts_repo.create(conn, question_id, False)
             st.rerun()
     with col_summary:
         if summary["total"] == 0:
@@ -51,7 +51,7 @@ def render_question_row(conn: sqlite3.Connection, question: sqlite3.Row) -> None
         else:
             st.caption(
                 f"{summary['independent']}/{summary['total']} samodzielnie "
-                f"({summary['pct']:.0f}%)"
+                f"({int(summary['pct'])}%)"
             )
 
     if attempts:
@@ -63,19 +63,40 @@ def render_question_row(conn: sqlite3.Connection, question: sqlite3.Row) -> None
     st.divider()
 
 
+def _on_add_question(conn: sqlite3.Connection, phase_id: int) -> None:
+    # Celowo bez st.form: pola formularzy trzymają lokalny stan we froncie
+    # i nie da się ich niezawodnie wyczyścić z session_state. Zwykły widget
+    # + czyszczenie klucza w callbacku przycisku działa przewidywalnie.
+    text_key = f"add_question_text_{phase_id}"
+    error_key = f"add_question_error_{phase_id}"
+    text = st.session_state.get(text_key, "").strip()
+    if text:
+        question_type = st.session_state.get(f"question_type_{phase_id}", "concept")
+        questions_repo.create(conn, phase_id, text, question_type)
+        st.session_state[text_key] = ""
+        st.session_state.pop(error_key, None)
+    else:
+        st.session_state[error_key] = "Treść pytania nie może być pusta."
+
+
 def render_add_question_form(conn: sqlite3.Connection, phase_id: int) -> None:
-    with st.form(key=f"add_question_form_{phase_id}", clear_on_submit=True):
-        text = st.text_area("Nowe pytanie", height=80)
-        question_type = st.selectbox(
+    with st.container(border=True):
+        st.text_area("Nowe pytanie", height=80, key=f"add_question_text_{phase_id}")
+        st.selectbox(
             "Typ",
             options=list(QUESTION_TYPE_LABELS.keys()),
             format_func=lambda key: QUESTION_TYPE_LABELS[key],
             key=f"question_type_{phase_id}",
         )
-        submitted = st.form_submit_button("Dodaj pytanie")
-        if submitted and text.strip():
-            questions_repo.create(conn, phase_id, text.strip(), question_type)
-            st.rerun()
+        st.button(
+            "Dodaj pytanie",
+            key=f"add_question_submit_{phase_id}",
+            on_click=_on_add_question,
+            args=(conn, phase_id),
+        )
+        error = st.session_state.get(f"add_question_error_{phase_id}")
+        if error:
+            st.error(error)
 
 
 def render_phase_questions_section(conn: sqlite3.Connection, phase: sqlite3.Row) -> None:

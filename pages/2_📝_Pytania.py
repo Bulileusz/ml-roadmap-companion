@@ -9,5 +9,5 @@ st.title("📝 Bank pytań")
 
 conn = init_app()
 
-for phase in phases_repo.list_phases(conn):
+for phase in phases_repo.list_all(conn):
     render_phase_questions_section(conn, phase)

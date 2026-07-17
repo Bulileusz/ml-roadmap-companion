@@ -14,7 +14,16 @@ streamlit run app.py
 ```
 
 Baza danych (`data/roadmap.db`) tworzy się i seeduje automatycznie przy
-pierwszym uruchomieniu.
+pierwszym uruchomieniu. Obok pliku bazy pojawiają się pliki pomocnicze
+WAL (`roadmap.db-wal`, `roadmap.db-shm`) — to normalne, są ignorowane
+przez git.
+
+## Testy
+
+```
+pip install -r requirements-dev.txt
+python -m pytest
+```
 
 ## Moduły
 
@@ -25,8 +34,10 @@ pierwszym uruchomieniu.
   usuwanie fiszek z UI.
 - **Moduł 3 (gotowy)** — bank pytań sprawdzających zrozumienie, per faza:
   oznaczanie "rozwiązałem samodzielnie" / "musiałem sprawdzić", pełny log
-  dat podejść (`question_attempts`) i prosty wskaźnik trendu (% samodzielnie
-  na wszystkich podejściach).
+  dat podejść (`question_attempts`) i skumulowany wskaźnik: % podejść
+  rozwiązanych samodzielnie, liczony ze wszystkich podejść (bez okna
+  czasowego). Edycja treści istniejących pytań — planowana, jeszcze nie
+  zaimplementowana (pytania można dodawać i usuwać).
 
 ## Architektura
 
@@ -37,8 +48,14 @@ db/               połączenie SQLite, schema, dane startowe (seed), bootstrap
 repository/       CRUD na tabelach (phases, tasks, flashcards, questions, question_attempts)
 services/         logika biznesowa (postęp, spaced repetition, statystyki pytań)
 ui/               funkcje renderujące widgety Streamlit
+tests/            testy pytest (logika, repozytoria, migracje, seed)
 data/             plik roadmap.db (nieśledzony w git)
 ```
+
+**Czas:** aplikacja liczy "dziś"/"teraz" wyłącznie czasem lokalnym maszyny
+(`services/clock.py`) — zarówno przy zapisie terminów powtórek, jak i przy
+pytaniu o fiszki "na dziś". Schemat bazy jest wersjonowany przez
+`PRAGMA user_version` (`db/schema.py`, lista `MIGRATIONS`).
 
 **Wzorzec kluczy obcych między modułami:** rozróżniamy dwa typy relacji.
 Cross-module, opcjonalny link do Modułu 1 (np. `flashcards.phase_id`,

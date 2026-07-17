@@ -11,7 +11,7 @@ def phase_progress_pct(done: int, total: int) -> float:
 
 def get_all_phase_progress(conn: sqlite3.Connection) -> list[dict]:
     result = []
-    for phase in phases_repo.list_phases(conn):
+    for phase in phases_repo.list_all(conn):
         done, total = tasks_repo.count_progress(conn, phase["id"])
         result.append(
             {
@@ -25,8 +25,5 @@ def get_all_phase_progress(conn: sqlite3.Connection) -> list[dict]:
 
 
 def get_overall_progress(conn: sqlite3.Connection) -> dict:
-    row = conn.execute(
-        "SELECT COUNT(*) AS total, COALESCE(SUM(is_done), 0) AS done FROM tasks"
-    ).fetchone()
-    done, total = row["done"], row["total"]
+    done, total = tasks_repo.count_progress_overall(conn)
     return {"done": done, "total": total, "pct": phase_progress_pct(done, total)}

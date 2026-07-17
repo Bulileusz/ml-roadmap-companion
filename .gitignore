@@ -7,9 +7,11 @@ __pycache__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Local data (SQLite database)
+# Local data (SQLite database + WAL sidecars)
 *.db
 data/*.db
+*.db-wal
+*.db-shm
 
 # Env
 .env

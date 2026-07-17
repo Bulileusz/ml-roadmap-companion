@@ -12,18 +12,24 @@ def render_progress_bar(pct: float, caption: str) -> None:
 
 def _on_toggle_done(conn: sqlite3.Connection, task_id: int) -> None:
     is_done = st.session_state[f"done_{task_id}"]
-    tasks_repo.set_task_done(conn, task_id, is_done)
+    tasks_repo.set_done(conn, task_id, is_done)
 
 
-def _on_title_change(conn: sqlite3.Connection, task_id: int) -> None:
-    title = st.session_state[f"title_{task_id}"].strip()
+def _on_title_change(conn: sqlite3.Connection, task_id: int, prev_title: str) -> None:
+    key = f"title_{task_id}"
+    title = st.session_state[key].strip()
     if title:
-        tasks_repo.update_task_title(conn, task_id, title)
+        tasks_repo.update_title(conn, task_id, title)
+    else:
+        # Pusty tytuł: przywracamy poprzednią wartość, żeby widget
+        # nie rozjechał się z bazą.
+        st.session_state[key] = prev_title
+        st.toast("Tytuł nie może być pusty", icon="⚠️")
 
 
 def _on_notes_change(conn: sqlite3.Connection, task_id: int) -> None:
     notes = st.session_state[f"notes_{task_id}"]
-    tasks_repo.update_task_notes(conn, task_id, notes)
+    tasks_repo.update_notes(conn, task_id, notes)
 
 
 def render_task_row(conn: sqlite3.Connection, task: sqlite3.Row) -> None:
@@ -48,7 +54,7 @@ def render_task_row(conn: sqlite3.Connection, task: sqlite3.Row) -> None:
             value=task["title"],
             key=f"title_{task_id}",
             on_change=_on_title_change,
-            args=(conn, task_id),
+            args=(conn, task_id, task["title"]),
             label_visibility="collapsed",
         )
 
@@ -56,7 +62,7 @@ def render_task_row(conn: sqlite3.Connection, task: sqlite3.Row) -> None:
         if st.session_state.get(confirm_key):
             c1, c2 = st.columns(2)
             if c1.button("Tak", key=f"delete_yes_{task_id}"):
-                tasks_repo.delete_task(conn, task_id)
+                tasks_repo.delete(conn, task_id)
                 st.session_state[confirm_key] = False
                 st.rerun()
             if c2.button("Anuluj", key=f"delete_no_{task_id}"):
@@ -80,23 +86,45 @@ def render_task_row(conn: sqlite3.Connection, task: sqlite3.Row) -> None:
     st.divider()
 
 
+def _on_add_task(conn: sqlite3.Connection, phase_id: int) -> None:
+    # Celowo bez st.form: pola formularzy trzymają lokalny stan we froncie
+    # i nie da się ich niezawodnie wyczyścić z session_state. Zwykły widget
+    # + czyszczenie klucza w callbacku przycisku działa przewidywalnie.
+    title_key = f"add_task_title_{phase_id}"
+    error_key = f"add_task_error_{phase_id}"
+    title = st.session_state.get(title_key, "").strip()
+    if title:
+        tasks_repo.create(conn, phase_id, title)
+        st.session_state[title_key] = ""
+        st.session_state.pop(error_key, None)
+    else:
+        st.session_state[error_key] = "Tytuł zadania nie może być pusty."
+
+
 def render_add_task_form(conn: sqlite3.Connection, phase_id: int) -> None:
-    with st.form(key=f"add_task_form_{phase_id}", clear_on_submit=True):
-        title = st.text_input("Nowe zadanie")
-        submitted = st.form_submit_button("Dodaj zadanie")
-        if submitted and title.strip():
-            tasks_repo.create_task(conn, phase_id, title.strip())
-            st.rerun()
+    with st.container(border=True):
+        st.text_input("Nowe zadanie", key=f"add_task_title_{phase_id}")
+        st.button(
+            "Dodaj zadanie",
+            key=f"add_task_submit_{phase_id}",
+            on_click=_on_add_task,
+            args=(conn, phase_id),
+        )
+        error = st.session_state.get(f"add_task_error_{phase_id}")
+        if error:
+            st.error(error)
 
 
-def render_phase_section(conn: sqlite3.Connection, phase: sqlite3.Row, expanded: bool = False) -> None:
-    done, total = tasks_repo.count_progress(conn, phase["id"])
-    pct = 0.0 if total == 0 else done / total * 100
+def render_phase_section(
+    conn: sqlite3.Connection, entry: dict, expanded: bool = False
+) -> None:
+    phase = entry["phase"]
+    done, total, pct = entry["done"], entry["total"], entry["pct"]
 
     with st.expander(phase["name"], expanded=expanded):
-        render_progress_bar(pct, f"{done}/{total} zadań ({pct:.0f}%)")
+        render_progress_bar(pct, f"{done}/{total} zadań ({int(pct)}%)")
 
-        tasks = tasks_repo.list_tasks_by_phase(conn, phase["id"])
+        tasks = tasks_repo.list_by_phase(conn, phase["id"])
         for task in tasks:
             render_task_row(conn, task)
 

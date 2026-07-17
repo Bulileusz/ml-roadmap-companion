@@ -1,7 +1,12 @@
 import sqlite3
 
-# Moduł 2 (fiszki/SRS) i Moduł 3 (bank pytań) dodadzą własne tabele
-# referencujące phases(id) / tasks(id) - bez zmian w schemacie poniżej.
+# Wersjonowanie schematu przez PRAGMA user_version: każda pozycja MIGRATIONS
+# to jedna wersja, aplikowana raz. Zmiany schematu = nowa funkcja na końcu
+# listy, nigdy edycja już wydanej migracji.
+#
+# Defaulty datetime('now')/date('now') poniżej są w UTC - zostają jako
+# nieszkodliwy fallback; aplikacja ustawia te kolumny jawnie czasem lokalnym
+# (services/clock.py), więc defaulty nie są używane w normalnym działaniu.
 
 _CREATE_PHASES = """
 CREATE TABLE IF NOT EXISTS phases (
@@ -82,7 +87,9 @@ CREATE INDEX IF NOT EXISTS idx_question_attempts_question_id ON question_attempt
 """
 
 
-def init_db(conn: sqlite3.Connection) -> None:
+def _migration_1_initial_schema(conn: sqlite3.Connection) -> None:
+    # IF NOT EXISTS pozwala bezpiecznie "zaadoptować" bazę sprzed
+    # wersjonowania (tabele istnieją, user_version = 0).
     conn.execute(_CREATE_PHASES)
     conn.execute(_CREATE_TASKS)
     conn.execute(_CREATE_TASKS_INDEX)
@@ -92,4 +99,16 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.execute(_CREATE_QUESTIONS_INDEX)
     conn.execute(_CREATE_QUESTION_ATTEMPTS)
     conn.execute(_CREATE_QUESTION_ATTEMPTS_INDEX)
-    conn.commit()
+
+
+MIGRATIONS = [_migration_1_initial_schema]
+
+
+def init_db(conn: sqlite3.Connection) -> None:
+    current = conn.execute("PRAGMA user_version").fetchone()[0]
+    for version, migration in enumerate(MIGRATIONS[current:], start=current + 1):
+        migration(conn)
+        # PRAGMA nie przyjmuje parametrów wiązanych; version pochodzi
+        # wyłącznie z enumerate, nie z wejścia użytkownika.
+        conn.execute(f"PRAGMA user_version = {version}")
+        conn.commit()
