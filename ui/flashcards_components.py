@@ -6,6 +6,10 @@ from repository import flashcards_repo
 from services import spaced_repetition
 
 
+# Kolor badge'a rośnie z pudełkiem: świeża fiszka szara, opanowana zielona.
+BOX_BADGE_COLORS = {1: "gray", 2: "blue", 3: "violet", 4: "orange", 5: "green"}
+
+
 def render_due_today_section(conn: sqlite3.Connection) -> None:
     st.subheader("Dzisiejsze powtórki")
     due = spaced_repetition.get_due_cards(conn)
@@ -18,24 +22,34 @@ def render_due_today_section(conn: sqlite3.Connection) -> None:
     card_id = card["id"]
     reveal_key = f"reveal_{card_id}"
 
-    st.caption(f"Zostało dzisiaj: {len(due)}")
-    st.markdown(f"### {card['front']}")
+    with st.container(border=True):
+        st.badge(f"Zostało dzisiaj: {len(due)}", color="green")
+        st.markdown(f"### {card['front']}")
 
-    if st.session_state.get(reveal_key):
-        st.info(card["back"])
-        col_wrong, col_right = st.columns(2)
-        if col_wrong.button("❌ Nie umiałem", key=f"wrong_{card_id}"):
-            spaced_repetition.record_review(conn, card_id, correct=False)
-            st.session_state[reveal_key] = False
-            st.rerun()
-        if col_right.button("✅ Umiałem", key=f"right_{card_id}"):
-            spaced_repetition.record_review(conn, card_id, correct=True)
-            st.session_state[reveal_key] = False
-            st.rerun()
-    else:
-        if st.button("Pokaż odpowiedź", key=f"show_{card_id}"):
-            st.session_state[reveal_key] = True
-            st.rerun()
+        if st.session_state.get(reveal_key):
+            st.info(card["back"])
+            col_wrong, col_right = st.columns(2)
+            if col_wrong.button(
+                "❌ Nie umiałem", key=f"wrong_{card_id}", use_container_width=True
+            ):
+                spaced_repetition.record_review(conn, card_id, correct=False)
+                st.session_state[reveal_key] = False
+                st.rerun()
+            if col_right.button(
+                "✅ Umiałem",
+                key=f"right_{card_id}",
+                type="primary",
+                use_container_width=True,
+            ):
+                spaced_repetition.record_review(conn, card_id, correct=True)
+                st.session_state[reveal_key] = False
+                st.rerun()
+        else:
+            if st.button(
+                "Pokaż odpowiedź", key=f"show_{card_id}", use_container_width=True
+            ):
+                st.session_state[reveal_key] = True
+                st.rerun()
 
 
 def _on_add_flashcard(conn: sqlite3.Connection, phase_options: dict) -> None:
@@ -134,9 +148,10 @@ def render_flashcard_edit_row(conn: sqlite3.Connection, card: sqlite3.Row) -> No
                 st.session_state[confirm_key] = True
                 st.rerun()
 
+    box_color = BOX_BADGE_COLORS.get(card["box"], "gray")
     st.caption(
-        f"Pudełko {card['box']}/{spaced_repetition.MAX_BOX} "
-        f"• następna powtórka: {card['next_review_at']}"
+        f":{box_color}-badge[📦 {card['box']}/{spaced_repetition.MAX_BOX}] "
+        f"· następna powtórka: {card['next_review_at']}"
     )
     st.divider()
 

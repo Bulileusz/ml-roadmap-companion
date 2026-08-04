@@ -6,6 +6,7 @@ from repository import question_attempts_repo, questions_repo
 from services import question_stats
 
 QUESTION_TYPE_LABELS = {"concept": "Koncepcyjne", "code": "Kodowe"}
+QUESTION_TYPE_BADGE_COLORS = {"concept": "blue", "code": "violet"}
 
 
 def render_question_row(conn: sqlite3.Connection, question: sqlite3.Row) -> None:
@@ -17,7 +18,10 @@ def render_question_row(conn: sqlite3.Connection, question: sqlite3.Row) -> None
     with col_text:
         st.markdown(f"**{question['question_text']}**")
     with col_type:
-        st.caption(QUESTION_TYPE_LABELS.get(question["question_type"], question["question_type"]))
+        st.badge(
+            QUESTION_TYPE_LABELS.get(question["question_type"], question["question_type"]),
+            color=QUESTION_TYPE_BADGE_COLORS.get(question["question_type"], "gray"),
+        )
     with col_delete:
         if st.session_state.get(confirm_key):
             c1, c2 = st.columns(2)
@@ -49,16 +53,20 @@ def render_question_row(conn: sqlite3.Connection, question: sqlite3.Row) -> None
         if summary["total"] == 0:
             st.caption("Brak podejść jeszcze.")
         else:
-            st.caption(
-                f"{summary['independent']}/{summary['total']} samodzielnie "
-                f"({int(summary['pct'])}%)"
+            st.progress(
+                summary["pct"] / 100,
+                text=(
+                    f"{summary['independent']}/{summary['total']} samodzielnie "
+                    f"({int(summary['pct'])}%)"
+                ),
             )
 
     if attempts:
         with st.expander(f"Historia podejść ({len(attempts)})"):
             for attempt in attempts:
                 icon = "✅" if attempt["solved_independently"] else "📖"
-                st.caption(f"{icon} {attempt['attempted_at']}")
+                # Obcinamy sekundy: "YYYY-MM-DD HH:MM".
+                st.caption(f"{icon} `{attempt['attempted_at'][:16]}`")
 
     st.divider()
 

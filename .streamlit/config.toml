@@ -1,0 +1,18 @@
+# Motyw: ciemny, klimat terminala/edytora kodu.
+[theme]
+base = "dark"
+primaryColor = "#3FB950"            # terminalowa zielen
+backgroundColor = "#0D1117"         # GitHub-dark
+secondaryBackgroundColor = "#161B22"
+textColor = "#E6EDF3"
+linkColor = "#58A6FF"
+borderColor = "#30363D"
+showWidgetBorder = true
+baseRadius = "small"
+buttonRadius = "small"
+font = "sans-serif"                 # body czytelny
+headingFont = "monospace"           # naglowki w klimacie terminala
+codeFont = "monospace"
+
+[theme.sidebar]
+backgroundColor = "#010409"         # ciemniejszy sidebar nawigacji

@@ -68,6 +68,26 @@ def test_count_progress_per_phase_and_overall(conn):
     assert tasks_repo.count_progress_overall(conn) == (1, 3)
 
 
+def test_first_incomplete_empty_db(conn):
+    assert tasks_repo.first_incomplete(conn) is None
+
+
+def test_first_incomplete_skips_done_and_respects_order(conn):
+    phase_b = _make_phase(conn, "b", "Faza B")
+    conn.execute("UPDATE phases SET order_index = 1 WHERE id = ?", (phase_b,))
+    phase_a = _make_phase(conn, "a", "Faza A")
+    conn.commit()
+    tasks_repo.create(conn, phase_b, "Z późnej fazy")
+    done = tasks_repo.create(conn, phase_a, "Zrobione")
+    tasks_repo.create(conn, phase_a, "Niezrobione")
+    tasks_repo.set_done(conn, done, True)
+
+    task = tasks_repo.first_incomplete(conn)
+
+    assert task["title"] == "Niezrobione"
+    assert task["phase_name"] == "Faza A"
+
+
 def test_deleting_phase_cascades_tasks(conn):
     phase_id = _make_phase(conn)
     tasks_repo.create(conn, phase_id, "Zadanie")

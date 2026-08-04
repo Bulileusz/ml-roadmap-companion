@@ -25,6 +25,16 @@ def test_list_due_boundary_dates(conn):
     assert [c["id"] for c in due] == [past, today]
 
 
+def test_count_due_and_count_by_box(conn):
+    flashcards_repo.create(conn, "wczoraj", "x", None, "2026-01-09")
+    flashcards_repo.create(conn, "dziś", "x", None, "2026-01-10")
+    future = flashcards_repo.create(conn, "jutro", "x", None, "2026-01-11")
+    flashcards_repo.update_schedule(conn, future, 3, "2026-01-14")
+
+    assert flashcards_repo.count_due(conn, "2026-01-10") == 2
+    assert flashcards_repo.count_by_box(conn) == {1: 2, 3: 1}
+
+
 def test_update_content_and_schedule(conn):
     card_id = flashcards_repo.create(conn, "a", "b", None, "2026-01-10")
 

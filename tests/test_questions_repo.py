@@ -41,6 +41,19 @@ def test_attempts_ordered_newest_first_with_id_tiebreak(conn):
     assert [a["solved_independently"] for a in attempts] == [0, 1]
 
 
+def test_count_overall_attempts(conn):
+    phase_id = _make_phase(conn)
+    question_id = questions_repo.create(conn, phase_id, "Pytanie", "concept")
+
+    assert question_attempts_repo.count_overall(conn) == (0, 0)
+
+    question_attempts_repo.create(conn, question_id, True)
+    question_attempts_repo.create(conn, question_id, False)
+    question_attempts_repo.create(conn, question_id, True)
+
+    assert question_attempts_repo.count_overall(conn) == (2, 3)
+
+
 def test_deleting_question_cascades_attempts(conn):
     phase_id = _make_phase(conn)
     question_id = questions_repo.create(conn, phase_id, "Pytanie", "concept")

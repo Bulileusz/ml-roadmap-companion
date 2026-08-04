@@ -7,9 +7,11 @@ from ui.flashcards_components import (
     render_all_flashcards_list,
     render_due_today_section,
 )
+from ui.theme import page_setup
 
-st.set_page_config(page_title="Fiszki - ML Roadmap Companion", page_icon="🃏", layout="wide")
+page_setup("Fiszki - ML Roadmap Companion", "🃏")
 st.title("🃏 Fiszki")
+st.markdown("`$ ml-roadmap --review`")
 
 conn = init_app()
 

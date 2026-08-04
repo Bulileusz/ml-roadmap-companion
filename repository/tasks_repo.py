@@ -53,6 +53,15 @@ def delete(conn: sqlite3.Connection, task_id: int) -> None:
     conn.commit()
 
 
+def first_incomplete(conn: sqlite3.Connection) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT tasks.*, phases.name AS phase_name "
+        "FROM tasks JOIN phases ON phases.id = tasks.phase_id "
+        "WHERE tasks.is_done = 0 "
+        "ORDER BY phases.order_index, tasks.order_index, tasks.id LIMIT 1"
+    ).fetchone()
+
+
 def count_progress(conn: sqlite3.Connection, phase_id: int) -> tuple[int, int]:
     row = conn.execute(
         "SELECT COUNT(*) AS total, COALESCE(SUM(is_done), 0) AS done "

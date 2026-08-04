@@ -116,12 +116,15 @@ def render_add_task_form(conn: sqlite3.Connection, phase_id: int) -> None:
 
 
 def render_phase_section(
-    conn: sqlite3.Connection, entry: dict, expanded: bool = False
+    conn: sqlite3.Connection,
+    entry: dict,
+    expanded: bool = False,
+    icon: str | None = None,
 ) -> None:
     phase = entry["phase"]
     done, total, pct = entry["done"], entry["total"], entry["pct"]
 
-    with st.expander(phase["name"], expanded=expanded):
+    with st.expander(phase["name"], expanded=expanded, icon=icon):
         render_progress_bar(pct, f"{done}/{total} zadań ({int(pct)}%)")
 
         tasks = tasks_repo.list_by_phase(conn, phase["id"])

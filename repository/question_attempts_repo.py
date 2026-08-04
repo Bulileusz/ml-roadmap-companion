@@ -12,6 +12,15 @@ def list_by_question(conn: sqlite3.Connection, question_id: int) -> list[sqlite3
     ).fetchall()
 
 
+def count_overall(conn: sqlite3.Connection) -> tuple[int, int]:
+    row = conn.execute(
+        "SELECT COUNT(*) AS total, "
+        "COALESCE(SUM(solved_independently), 0) AS independent "
+        "FROM question_attempts"
+    ).fetchone()
+    return row["independent"], row["total"]
+
+
 def create(
     conn: sqlite3.Connection, question_id: int, solved_independently: bool
 ) -> int:
