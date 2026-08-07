@@ -1,0 +1,16 @@
+# Osobny plik zamiast pyproject.toml, żeby nie ruszać działającego pytest.ini.
+line-length = 88
+
+[lint]
+# E/F - pycodestyle + pyflakes (baza), I - kolejność importów,
+# UP - modernizacja składni pod aktualnego Pythona, B - typowe pułapki
+# (bugbear, m.in. mutowalne wartości domyślne).
+select = ["E", "F", "I", "UP", "B"]
+
+[lint.per-file-ignores]
+# Długie linie w tych dwóch plikach to treść, nie kod: DDL-e SQL trzymamy
+# w jednym kawałku (łamanie CHECK-a czy CREATE INDEX psuje czytelność
+# schematu), a tytuły zadań w seedzie to zdania po polsku - zawijanie ich
+# konkatenacją utrudniłoby wyszukiwanie po treści.
+"db/schema.py" = ["E501"]
+"db/seed_data.py" = ["E501"]

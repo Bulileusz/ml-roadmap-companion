@@ -5,7 +5,6 @@ import streamlit as st
 from repository import flashcards_repo
 from services import spaced_repetition
 
-
 # Kolor badge'a rośnie z pudełkiem: świeża fiszka szara, opanowana zielona.
 BOX_BADGE_COLORS = {1: "gray", 2: "blue", 3: "violet", 4: "orange", 5: "green"}
 
@@ -70,7 +69,9 @@ def _on_add_flashcard(conn: sqlite3.Connection, phase_options: dict) -> None:
         st.session_state["add_card_error"] = "Tył fiszki nie może być pusty."
 
 
-def render_add_flashcard_form(conn: sqlite3.Connection, phases: list[sqlite3.Row]) -> None:
+def render_add_flashcard_form(
+    conn: sqlite3.Connection, phases: list[sqlite3.Row]
+) -> None:
     phase_options = {"— brak —": None}
     for phase in phases:
         phase_options[phase["name"]] = phase["id"]

@@ -32,9 +32,7 @@ def count_by_box(conn: sqlite3.Connection) -> dict[int, int]:
 
 
 def get(conn: sqlite3.Connection, card_id: int) -> sqlite3.Row | None:
-    return conn.execute(
-        "SELECT * FROM flashcards WHERE id = ?", (card_id,)
-    ).fetchone()
+    return conn.execute("SELECT * FROM flashcards WHERE id = ?", (card_id,)).fetchone()
 
 
 def create(

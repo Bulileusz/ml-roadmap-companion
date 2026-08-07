@@ -18,9 +18,10 @@ def render_question_row(conn: sqlite3.Connection, question: sqlite3.Row) -> None
     with col_text:
         st.markdown(f"**{question['question_text']}**")
     with col_type:
+        question_type = question["question_type"]
         st.badge(
-            QUESTION_TYPE_LABELS.get(question["question_type"], question["question_type"]),
-            color=QUESTION_TYPE_BADGE_COLORS.get(question["question_type"], "gray"),
+            QUESTION_TYPE_LABELS.get(question_type, question_type),
+            color=QUESTION_TYPE_BADGE_COLORS.get(question_type, "gray"),
         )
     with col_delete:
         if st.session_state.get(confirm_key):
@@ -107,7 +108,9 @@ def render_add_question_form(conn: sqlite3.Connection, phase_id: int) -> None:
             st.error(error)
 
 
-def render_phase_questions_section(conn: sqlite3.Connection, phase: sqlite3.Row) -> None:
+def render_phase_questions_section(
+    conn: sqlite3.Connection, phase: sqlite3.Row
+) -> None:
     questions = questions_repo.list_by_phase(conn, phase["id"])
 
     with st.expander(f"{phase['name']} ({len(questions)})"):
