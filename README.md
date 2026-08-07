@@ -46,14 +46,29 @@ python -m pytest
   wczoraj — inaczej znikałaby o północy, zanim dzisiejszy dzień nauki się
   zacznie.
 
+## Kopia zapasowa danych
+
+Strona 💾 **Dane** pozwala pobrać całą bazę jako jeden plik JSON
+(`roadmap-export-RRRR-MM-DD.json`) i wczytać ją z powrotem. Import
+**zastępuje całą zawartość bazy**, więc przed nadpisaniem apka robi kopię
+obok pliku bazy (`data/roadmap.db.bak-RRRR-MM-DD-HHMMSS`) — przez
+`sqlite3.Connection.backup()`, a nie kopiowanie pliku, bo baza chodzi
+w trybie WAL i surowa kopia bez sidecarów potrafi być niespójna.
+
+Import idzie w jednej transakcji: błąd w połowie oznacza pełny rollback,
+więc nieudane wczytanie nigdy nie zostawia bazy w stanie pośrednim.
+Identyfikatory wierszy są zachowywane, żeby relacje między tabelami
+przetrwały przeniesienie na inną maszynę. Plik z nowszej wersji schematu
+jest odrzucany zamiast wczytywany po cichu.
+
 ## Architektura
 
 ```
 app.py            strona "Roadmap" (streamlit run app.py)
-pages/             kolejne strony multipage (Fiszki, Pytania, Dziennik)
+pages/             kolejne strony multipage (Fiszki, Pytania, Dziennik, Dane)
 db/               połączenie SQLite, schema, dane startowe (seed), bootstrap
 repository/       CRUD na tabelach (phases, tasks, flashcards, questions, question_attempts, activity_log)
-services/         logika biznesowa (postęp, spaced repetition, statystyki pytań, serie dni)
+services/         logika biznesowa (postęp, spaced repetition, statystyki pytań, serie dni, backup)
 ui/               funkcje renderujące widgety Streamlit
 tests/            testy pytest (logika, repozytoria, migracje, seed)
 data/             plik roadmap.db (nieśledzony w git)
