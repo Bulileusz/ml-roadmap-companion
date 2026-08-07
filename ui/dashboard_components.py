@@ -10,11 +10,18 @@ def _fiszki_form(n: int) -> str:
     return "fiszek"
 
 
+def _dni_form(n: int) -> str:
+    # Polska odmiana: 1 dzień, 2-4 dni, 5+ dni - "dni" poza mianownikiem
+    # liczby pojedynczej jest niezmienne, więc rozróżniamy tylko 1 vs reszta.
+    return "dzień" if n == 1 else "dni"
+
+
 def render_metrics_row(data: dict) -> None:
     roadmap = data["roadmap"]
     independence = data["independence"]
+    streak = data["streak"]
 
-    col_roadmap, col_due, col_ind = st.columns(3)
+    col_roadmap, col_due, col_ind, col_streak = st.columns(4)
     col_roadmap.metric(
         "Postęp roadmapy",
         f"{int(roadmap['pct'])}%",
@@ -34,6 +41,13 @@ def render_metrics_row(data: dict) -> None:
         "Samodzielność",
         ind_value,
         delta=f"{independence['independent']}/{independence['total']} podejść",
+        delta_color="off",
+        border=True,
+    )
+    col_streak.metric(
+        "Seria dni",
+        f"{streak['current']} {_dni_form(streak['current'])}",
+        delta=f"rekord: {streak['longest']}",
         delta_color="off",
         border=True,
     )

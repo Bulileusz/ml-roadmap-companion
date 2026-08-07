@@ -38,15 +38,22 @@ python -m pytest
   rozwiązanych samodzielnie, liczony ze wszystkich podejść (bez okna
   czasowego). Treść, typ i faza istniejącego pytania są edytowalne w miejscu.
   Zmiana fazy przenosi pytanie między expanderami — to zamierzone.
+- **Moduł 4 (gotowy)** — dziennik nauki: każde odhaczenie zadania, powtórka
+  fiszki i podejście do pytania trafia do `activity_log`. Strona 📔 Dziennik
+  pokazuje aktualną serię dni, rekord, pasek ostatnich 30 dni i historię
+  pogrupowaną po dniach; kafelek „Seria dni" jest też na stronie startowej.
+  Seria liczy się jako żywa również wtedy, gdy ostatnia aktywność była
+  wczoraj — inaczej znikałaby o północy, zanim dzisiejszy dzień nauki się
+  zacznie.
 
 ## Architektura
 
 ```
 app.py            strona "Roadmap" (streamlit run app.py)
-pages/             kolejne strony multipage (Fiszki, Pytania)
+pages/             kolejne strony multipage (Fiszki, Pytania, Dziennik)
 db/               połączenie SQLite, schema, dane startowe (seed), bootstrap
-repository/       CRUD na tabelach (phases, tasks, flashcards, questions, question_attempts)
-services/         logika biznesowa (postęp, spaced repetition, statystyki pytań)
+repository/       CRUD na tabelach (phases, tasks, flashcards, questions, question_attempts, activity_log)
+services/         logika biznesowa (postęp, spaced repetition, statystyki pytań, serie dni)
 ui/               funkcje renderujące widgety Streamlit
 tests/            testy pytest (logika, repozytoria, migracje, seed)
 data/             plik roadmap.db (nieśledzony w git)
@@ -65,6 +72,12 @@ właścicielska relacja rodzic-dziecko (np. `question_attempts.question_id`,
 podobnie jak `tasks.phase_id -> phases`) jest `NOT NULL` z
 `ON DELETE CASCADE` — usunięcie rodzica to świadoma decyzja skasowania
 całego jego zakresu, więc dzieci znikają razem z nim.
+
+Trzeci typ to **wpis historyczny**: `activity_log.ref_id` celowo *nie* jest
+kluczem obcym. Dziennik, który da się wyczyścić kasując taska, nie jest
+dziennikiem — wpis ma przeżyć usunięcie obiektu, którego dotyczy. Dlatego
+kolumna `detail` trzyma zdenormalizowaną migawkę tytułu i wpis pozostaje
+czytelny nawet po zniknięciu źródła.
 
 **Decyzja architektoniczna:** apka używa natywnego Streamlit multipage —
 `app.py` to strona startowa ("Roadmap"), kolejne moduły dochodzą jako

@@ -3,6 +3,7 @@ import sqlite3
 import streamlit as st
 
 from repository import tasks_repo
+from services import activity
 
 NO_PHASE_LABEL = "— brak —"
 
@@ -29,9 +30,9 @@ def render_progress_bar(pct: float, caption: str) -> None:
     st.caption(caption)
 
 
-def _on_toggle_done(conn: sqlite3.Connection, task_id: int) -> None:
-    is_done = st.session_state[f"done_{task_id}"]
-    tasks_repo.set_done(conn, task_id, is_done)
+def _on_toggle_done(conn: sqlite3.Connection, task: sqlite3.Row) -> None:
+    is_done = st.session_state[f"done_{task['id']}"]
+    activity.record_task_toggle(conn, task, is_done)
 
 
 def _on_title_change(conn: sqlite3.Connection, task_id: int, prev_title: str) -> None:
@@ -63,7 +64,7 @@ def render_task_row(conn: sqlite3.Connection, task: sqlite3.Row) -> None:
             value=bool(task["is_done"]),
             key=f"done_{task_id}",
             on_change=_on_toggle_done,
-            args=(conn, task_id),
+            args=(conn, task),
             label_visibility="collapsed",
         )
 

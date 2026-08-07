@@ -3,7 +3,7 @@ import sqlite3
 import streamlit as st
 
 from repository import question_attempts_repo, questions_repo
-from services import question_stats
+from services import activity, question_stats
 from ui.components import phase_label, phase_options
 
 QUESTION_TYPE_LABELS = {"concept": "Koncepcyjne", "code": "Kodowe"}
@@ -100,11 +100,11 @@ def render_question_row(
     col_solo, col_checked, col_summary = st.columns([0.3, 0.35, 0.35])
     with col_solo:
         if st.button("✅ Rozwiązałem samodzielnie", key=f"solo_{question_id}"):
-            question_attempts_repo.create(conn, question_id, True)
+            activity.record_question_attempt(conn, question, True)
             st.rerun()
     with col_checked:
         if st.button("📖 Musiałem sprawdzić rozwiązanie", key=f"checked_{question_id}"):
-            question_attempts_repo.create(conn, question_id, False)
+            activity.record_question_attempt(conn, question, False)
             st.rerun()
     with col_summary:
         if summary["total"] == 0:

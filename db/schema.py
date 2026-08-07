@@ -87,6 +87,42 @@ CREATE INDEX IF NOT EXISTS idx_question_attempts_question_id ON question_attempt
 """
 
 
+# activity_log.ref_id celowo NIE jest kluczem obcym - to trzeci wzorzec
+# relacji obok dwóch opisanych w README. Wpis dziennika ma przeżyć usunięcie
+# obiektu, którego dotyczy: dziennik, który da się wyczyścić kasując taska,
+# nie jest dziennikiem. Dlatego `detail` trzyma zdenormalizowaną migawkę
+# tytułu - wpis pozostaje czytelny nawet gdy źródło zniknie.
+_CREATE_ACTIVITY_LOG = """
+CREATE TABLE IF NOT EXISTS activity_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    occurred_at  TEXT NOT NULL,
+    kind         TEXT NOT NULL CHECK (kind IN ('task_done', 'task_undone', 'card_review', 'question_attempt')),
+    ref_id       INTEGER,
+    detail       TEXT NOT NULL DEFAULT ''
+);
+"""
+
+_CREATE_ACTIVITY_LOG_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_activity_log_occurred_at ON activity_log(occurred_at);
+"""
+
+# Backfill: question_attempts to jedyna tabela z prawdziwym logiem zdarzeń,
+# więc jej historię da się przenieść 1:1. Tasków i fiszek odtworzyć nie można -
+# updated_at jest nadpisywane przy każdej zmianie, więc niesie tylko datę
+# ostatniej edycji, nie przebieg. Historia tych dwóch zaczyna się od migracji.
+_BACKFILL_ACTIVITY_FROM_ATTEMPTS = """
+INSERT INTO activity_log (occurred_at, kind, ref_id, detail)
+SELECT
+    question_attempts.attempted_at,
+    'question_attempt',
+    question_attempts.question_id,
+    COALESCE(questions.question_text, '')
+FROM question_attempts
+LEFT JOIN questions ON questions.id = question_attempts.question_id
+ORDER BY question_attempts.attempted_at, question_attempts.id;
+"""
+
+
 def _migration_1_initial_schema(conn: sqlite3.Connection) -> None:
     # IF NOT EXISTS pozwala bezpiecznie "zaadoptować" bazę sprzed
     # wersjonowania (tabele istnieją, user_version = 0).
@@ -101,7 +137,19 @@ def _migration_1_initial_schema(conn: sqlite3.Connection) -> None:
     conn.execute(_CREATE_QUESTION_ATTEMPTS_INDEX)
 
 
-MIGRATIONS = [_migration_1_initial_schema]
+def _migration_2_activity_log(conn: sqlite3.Connection) -> None:
+    conn.execute(_CREATE_ACTIVITY_LOG)
+    conn.execute(_CREATE_ACTIVITY_LOG_INDEX)
+    # Backfill tylko do pustego dziennika. Tak jak IF NOT EXISTS wyżej, to
+    # zabezpieczenie ścieżki adopcji bazy sprzed wersjonowania, gdzie tabele
+    # już istnieją, a migracje przejeżdżają jeszcze raz - bez tego warunku
+    # historia podejść zdublowałaby się.
+    existing = conn.execute("SELECT COUNT(*) FROM activity_log").fetchone()[0]
+    if existing == 0:
+        conn.execute(_BACKFILL_ACTIVITY_FROM_ATTEMPTS)
+
+
+MIGRATIONS = [_migration_1_initial_schema, _migration_2_activity_log]
 
 
 def init_db(conn: sqlite3.Connection) -> None:
