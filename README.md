@@ -46,6 +46,26 @@ python -m pytest
   wczoraj — inaczej znikałaby o północy, zanim dzisiejszy dzień nauki się
   zacznie.
 
+## Materiały do nauki (`content/`)
+
+Fiszki i pytania trzymane są **w repo**, w katalogu `content/` — plik
+Markdown na fazę, nagłówek `##` to przód fiszki (albo treść pytania),
+tekst pod spodem to tył. Aplikacja wczytuje ten katalog przy każdym
+starcie, więc fiszka dopisana do pliku — choćby z telefonu, przez webowy
+edytor GitHuba — trafia do bazy przy następnym uruchomieniu.
+
+Import jest **addytywny i idempotentny**: każda pozycja jest zapisywana
+w ewidencji (`content_imports`), więc nie duplikuje się, nie nadpisuje
+zmian zrobionych w aplikacji i **nie wskrzesza pozycji skasowanych w UI**.
+Kluczem jest przód fiszki w obrębie fazy — poprawka tyłu w pliku nie
+trafi do bazy, zmiana przodu tworzy nową pozycję.
+
+Świeżo zaimportowane fiszki wchodzą po `NEW_CARDS_PER_DAY` (domyślnie 10)
+na dzień, żeby wgranie większego zestawu nie dało kilkudziesięciu powtórek
+pierwszego dnia. Fiszka dodana ręcznie w UI jest wymagalna od razu.
+
+Pełny opis formatu i wskazówki, skąd brać treść: `content/README.md`.
+
 ## Kopia zapasowa danych
 
 Strona 💾 **Dane** pozwala pobrać całą bazę jako jeden plik JSON
@@ -70,6 +90,7 @@ db/               połączenie SQLite, schema, dane startowe (seed), bootstrap
 repository/       CRUD na tabelach (phases, tasks, flashcards, questions, question_attempts, activity_log)
 services/         logika biznesowa (postęp, spaced repetition, statystyki pytań, serie dni, backup)
 ui/               funkcje renderujące widgety Streamlit
+content/          fiszki i pytania w Markdownie, wczytywane przy starcie
 tests/            testy pytest (logika, repozytoria, migracje, seed)
 data/             plik roadmap.db (nieśledzony w git)
 ```

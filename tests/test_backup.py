@@ -35,8 +35,15 @@ def _populate(conn):
 
 
 def _snapshot(conn):
+    # content_imports nie ma kolumny id (klucz to para kind+item_key).
+    orders = {"content_imports": "kind, item_key"}
     return {
-        table: [dict(row) for row in conn.execute(f"SELECT * FROM {table} ORDER BY id")]
+        table: [
+            dict(row)
+            for row in conn.execute(
+                f"SELECT * FROM {table} ORDER BY {orders.get(table, 'id')}"
+            )
+        ]
         for table in backup.TABLES
     }
 

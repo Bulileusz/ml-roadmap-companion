@@ -1,0 +1,185 @@
+import re
+import sqlite3
+from dataclasses import dataclass, field
+from datetime import date, timedelta
+from pathlib import Path
+
+from repository import content_imports_repo, phases_repo, questions_repo
+from services import clock, spaced_repetition
+
+CONTENT_ROOT = Path(__file__).resolve().parent.parent / "content"
+
+DEFAULT_QUESTION_TYPE = "concept"
+QUESTION_TYPES = ("concept", "code")
+
+# Ile świeżo zaimportowanych fiszek staje się wymagalnych tego samego dnia.
+# Wrzucenie startera bez tego dałoby kilkadziesiąt powtórek pierwszego dnia -
+# a lawina na starcie to najczęstszy powód porzucenia spaced repetition.
+# Kolejne partie dostają kolejne dni; fiszka dodana ręcznie w UI dalej jest
+# wymagalna od razu, bo to świadoma decyzja użytkownika.
+NEW_CARDS_PER_DAY = 10
+
+_SECTION = re.compile(r"^##[ \t]+(.*)$", re.MULTILINE)
+_TYPE_TAG = re.compile(r"^\[(\w+)\]\s*(.*)$")
+
+
+@dataclass
+class SyncResult:
+    flashcards_added: int = 0
+    questions_added: int = 0
+    skipped: int = 0
+    warnings: list[str] = field(default_factory=list)
+
+    @property
+    def total_added(self) -> int:
+        return self.flashcards_added + self.questions_added
+
+
+def normalize_key(phase_code: str, text: str) -> str:
+    """Klucz ewidencji: faza + treść bez różnic w białych znakach i wielkości.
+
+    Dzięki temu poprawka wcięcia albo wielkiej litery w pliku nie tworzy
+    duplikatu, a przeniesienie pozycji do innego pliku nic nie zmienia.
+    """
+    return f"{phase_code}|{' '.join(text.split()).lower()}"
+
+
+def parse_sections(text: str) -> list[tuple[str, str]]:
+    """Dzieli plik na sekcje '## nagłówek' + treść pod spodem."""
+    sections = []
+    matches = list(_SECTION.finditer(text))
+    for index, match in enumerate(matches):
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        sections.append((match.group(1).strip(), text[start:end].strip()))
+    return sections
+
+
+def phase_code_from_filename(path: Path) -> str:
+    """'2b-ensemble.md' -> '2b'. Kod fazy to część przed pierwszym myślnikiem."""
+    return path.stem.split("-", 1)[0]
+
+
+def split_type_tag(heading: str) -> tuple[str, str]:
+    """'[code] Napisz pętlę' -> ('code', 'Napisz pętlę'); bez tagu -> concept."""
+    match = _TYPE_TAG.match(heading)
+    if match and match.group(1) in QUESTION_TYPES:
+        return match.group(1), match.group(2).strip()
+    return DEFAULT_QUESTION_TYPE, heading
+
+
+def _markdown_files(directory: Path) -> list[Path]:
+    return sorted(directory.glob("*.md")) if directory.is_dir() else []
+
+
+def _sync_flashcards(
+    conn: sqlite3.Connection,
+    root: Path,
+    phase_ids: dict[str, int],
+    result: SyncResult,
+    today: date,
+) -> None:
+    seen = content_imports_repo.imported_keys(conn, content_imports_repo.KIND_FLASHCARD)
+
+    for path in _markdown_files(root / "flashcards"):
+        code = phase_code_from_filename(path)
+        if code not in phase_ids:
+            result.warnings.append(
+                f"{path.name}: nieznany kod fazy '{code}' - pomijam."
+            )
+            continue
+
+        for front, back in parse_sections(path.read_text(encoding="utf-8")):
+            if not front or not back:
+                result.warnings.append(
+                    f"{path.name}: fiszka '{front[:40]}' bez przodu albo tyłu "
+                    f"- pomijam."
+                )
+                continue
+
+            key = normalize_key(code, front)
+            if key in seen:
+                result.skipped += 1
+                continue
+
+            # Najpierw treść, potem ewidencja: awaria między tymi krokami
+            # oznacza duplikat przy następnym starcie (do skasowania w UI),
+            # a nie bezpowrotnie zgubioną fiszkę.
+            due = today + timedelta(days=result.flashcards_added // NEW_CARDS_PER_DAY)
+            spaced_repetition.create_card(conn, front, back, phase_ids[code], today=due)
+            content_imports_repo.mark_imported(
+                conn, content_imports_repo.KIND_FLASHCARD, key
+            )
+            seen.add(key)
+            result.flashcards_added += 1
+
+
+def _sync_questions(
+    conn: sqlite3.Connection, root: Path, phase_ids: dict[str, int], result: SyncResult
+) -> None:
+    seen = content_imports_repo.imported_keys(conn, content_imports_repo.KIND_QUESTION)
+
+    for path in _markdown_files(root / "questions"):
+        code = phase_code_from_filename(path)
+        if code not in phase_ids:
+            result.warnings.append(
+                f"{path.name}: nieznany kod fazy '{code}' - pomijam."
+            )
+            continue
+
+        # Treść pod nagłówkiem pytania jest ignorowana - schemat questions nie
+        # ma na nią kolumny, więc służy jako notatka dla ciebie w pliku.
+        for heading, _ in parse_sections(path.read_text(encoding="utf-8")):
+            question_type, text = split_type_tag(heading)
+            if not text:
+                continue
+
+            key = normalize_key(code, text)
+            if key in seen:
+                result.skipped += 1
+                continue
+
+            questions_repo.create(conn, phase_ids[code], text, question_type)
+            content_imports_repo.mark_imported(
+                conn, content_imports_repo.KIND_QUESTION, key
+            )
+            seen.add(key)
+            result.questions_added += 1
+
+
+def sync(
+    conn: sqlite3.Connection, root: Path | None = None, today: date | None = None
+) -> SyncResult:
+    """Dokłada do bazy pozycje z content/, których jeszcze nigdy nie importowano.
+
+    Import jest addytywny i jednokierunkowy: nowe pozycje wjeżdżają, ale
+    istniejące nie są nadpisywane, a skasowane w UI nie wracają. Poprawka
+    tyłu fiszki w pliku nie zmienia klucza, więc nie trafi do bazy - przód
+    zmieniasz w pliku, tył w aplikacji.
+    """
+    root = root or CONTENT_ROOT
+    result = SyncResult()
+    if not root.is_dir():
+        return result
+
+    phase_ids = {phase["code"]: phase["id"] for phase in phases_repo.list_all(conn)}
+    if not phase_ids:
+        result.warnings.append("Brak faz w bazie - import materiałów pominięty.")
+        return result
+
+    _sync_flashcards(conn, root, phase_ids, result, today or clock.today())
+    _sync_questions(conn, root, phase_ids, result)
+    return result
+
+
+def available_counts(root: Path | None = None) -> dict[str, int]:
+    """Ile pozycji leży w plikach - do pokazania obok liczby zaimportowanych."""
+    root = root or CONTENT_ROOT
+    counts = {"flashcards": 0, "questions": 0}
+    if not root.is_dir():
+        return counts
+
+    for kind, directory in (("flashcards", "flashcards"), ("questions", "questions")):
+        for path in _markdown_files(root / directory):
+            counts[kind] += len(parse_sections(path.read_text(encoding="utf-8")))
+    return counts

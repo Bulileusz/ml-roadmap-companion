@@ -4,7 +4,8 @@ import sqlite3
 import streamlit as st
 
 from db.connection import DB_PATH
-from services import backup
+from repository import content_imports_repo
+from services import backup, content
 
 TABLE_LABELS = {
     "phases": "fazy",
@@ -20,6 +21,47 @@ def _format_summary(summary: dict[str, int]) -> str:
     return " · ".join(
         f"{count} {TABLE_LABELS.get(table, table)}" for table, count in summary.items()
     )
+
+
+def render_content_section(conn: sqlite3.Connection) -> None:
+    st.subheader("Materiały z `content/`")
+    st.caption(
+        "Fiszki i pytania trzymane w repo wjeżdżają do bazy przy każdym starcie. "
+        "Import nie duplikuje, nie nadpisuje i nie wskrzesza skasowanych pozycji — "
+        "szczegóły w `content/README.md`."
+    )
+
+    available = content.available_counts()
+    imported = content_imports_repo.count_by_kind(conn)
+
+    with st.container(border=True):
+        col_cards, col_questions = st.columns(2)
+        col_cards.metric(
+            "Fiszki w plikach",
+            available["flashcards"],
+            delta=f"zaimportowano {imported.get('flashcard', 0)}",
+            delta_color="off",
+            border=True,
+        )
+        col_questions.metric(
+            "Pytania w plikach",
+            available["questions"],
+            delta=f"zaimportowano {imported.get('question', 0)}",
+            delta_color="off",
+            border=True,
+        )
+
+        if st.button("🔄 Wczytaj materiały teraz"):
+            result = content.sync(conn)
+            for warning in result.warnings:
+                st.warning(warning)
+            if result.total_added:
+                st.success(
+                    f"Dodano {result.flashcards_added} fiszek "
+                    f"i {result.questions_added} pytań."
+                )
+            else:
+                st.info(f"Nic nowego — {result.skipped} pozycji już w bazie.")
 
 
 def render_export_section(conn: sqlite3.Connection) -> None:

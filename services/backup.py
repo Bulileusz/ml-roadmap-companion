@@ -14,6 +14,10 @@ TABLES = [
     "questions",
     "question_attempts",
     "activity_log",
+    # Bez ewidencji importów w kopii odtworzenie backupu zgubiłoby wiedzę
+    # o tym, co już wjechało z content/, i przy najbliższym starcie
+    # zaimportowałoby wszystko drugi raz - obok wierszy z backupu.
+    "content_imports",
 ]
 
 FORMAT_VERSION = 1

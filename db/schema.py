@@ -137,6 +137,21 @@ def _migration_1_initial_schema(conn: sqlite3.Connection) -> None:
     conn.execute(_CREATE_QUESTION_ATTEMPTS_INDEX)
 
 
+# Ewidencja tego, co już wjechało z katalogu content/. Bez niej import przy
+# starcie wskrzeszałby fiszki skasowane wcześniej w UI - obecność wiersza
+# w flashcards nie mówi "czy to kiedykolwiek zaimportowano", tylko "czy jest
+# teraz". item_key celowo nie zawiera nazwy pliku: przeniesienie fiszki do
+# innego pliku ma nie robić z niej nowej pozycji.
+_CREATE_CONTENT_IMPORTS = """
+CREATE TABLE IF NOT EXISTS content_imports (
+    kind        TEXT NOT NULL CHECK (kind IN ('flashcard', 'question')),
+    item_key    TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (kind, item_key)
+);
+"""
+
+
 def _migration_2_activity_log(conn: sqlite3.Connection) -> None:
     conn.execute(_CREATE_ACTIVITY_LOG)
     conn.execute(_CREATE_ACTIVITY_LOG_INDEX)
@@ -149,7 +164,15 @@ def _migration_2_activity_log(conn: sqlite3.Connection) -> None:
         conn.execute(_BACKFILL_ACTIVITY_FROM_ATTEMPTS)
 
 
-MIGRATIONS = [_migration_1_initial_schema, _migration_2_activity_log]
+def _migration_3_content_imports(conn: sqlite3.Connection) -> None:
+    conn.execute(_CREATE_CONTENT_IMPORTS)
+
+
+MIGRATIONS = [
+    _migration_1_initial_schema,
+    _migration_2_activity_log,
+    _migration_3_content_imports,
+]
 
 
 def init_db(conn: sqlite3.Connection) -> None:
