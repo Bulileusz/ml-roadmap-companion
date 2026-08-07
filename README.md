@@ -31,13 +31,13 @@ python -m pytest
   2b, 3, 4): edytowalne taski, checkboxy, notatki, paski postępu.
 - **Moduł 2 (gotowy)** — fiszki / spaced repetition do pojęć ML (system
   Leitnera, 5 pudełek): widok dzisiejszych powtórek, dodawanie/edycja/
-  usuwanie fiszek z UI.
+  usuwanie fiszek z UI, przepinanie fiszki do innej fazy.
 - **Moduł 3 (gotowy)** — bank pytań sprawdzających zrozumienie, per faza:
   oznaczanie "rozwiązałem samodzielnie" / "musiałem sprawdzić", pełny log
   dat podejść (`question_attempts`) i skumulowany wskaźnik: % podejść
   rozwiązanych samodzielnie, liczony ze wszystkich podejść (bez okna
-  czasowego). Edycja treści istniejących pytań — planowana, jeszcze nie
-  zaimplementowana (pytania można dodawać i usuwać).
+  czasowego). Treść, typ i faza istniejącego pytania są edytowalne w miejscu.
+  Zmiana fazy przenosi pytanie między expanderami — to zamierzone.
 
 ## Architektura
 

@@ -4,6 +4,25 @@ import streamlit as st
 
 from repository import tasks_repo
 
+NO_PHASE_LABEL = "— brak —"
+
+
+def phase_options(phases: list[sqlite3.Row]) -> dict[str, int | None]:
+    """Etykieta widoczna w selectboxie -> phase_id (None = fiszka/pytanie luzem)."""
+    options: dict[str, int | None] = {NO_PHASE_LABEL: None}
+    for phase in phases:
+        options[phase["name"]] = phase["id"]
+    return options
+
+
+def phase_label(options: dict[str, int | None], phase_id: int | None) -> str:
+    for label, option_id in options.items():
+        if option_id == phase_id:
+            return label
+    # Faza mogła zostać usunięta (FK z ON DELETE SET NULL czyści phase_id
+    # dopiero w bazie) - w UI pokazujemy wtedy po prostu "brak".
+    return NO_PHASE_LABEL
+
 
 def render_progress_bar(pct: float, caption: str) -> None:
     st.progress(pct / 100)

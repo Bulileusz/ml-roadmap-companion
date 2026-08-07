@@ -63,6 +63,14 @@ def update_content(
     conn.commit()
 
 
+def update_phase(conn: sqlite3.Connection, card_id: int, phase_id: int | None) -> None:
+    conn.execute(
+        "UPDATE flashcards SET phase_id = ?, updated_at = ? WHERE id = ?",
+        (phase_id, clock.now_iso(), card_id),
+    )
+    conn.commit()
+
+
 def update_schedule(
     conn: sqlite3.Connection, card_id: int, box: int, next_review_at: str
 ) -> None:

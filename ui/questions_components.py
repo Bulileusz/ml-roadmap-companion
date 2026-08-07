@@ -4,24 +4,80 @@ import streamlit as st
 
 from repository import question_attempts_repo, questions_repo
 from services import question_stats
+from ui.components import phase_label, phase_options
 
 QUESTION_TYPE_LABELS = {"concept": "Koncepcyjne", "code": "Kodowe"}
 QUESTION_TYPE_BADGE_COLORS = {"concept": "blue", "code": "violet"}
 
 
-def render_question_row(conn: sqlite3.Connection, question: sqlite3.Row) -> None:
+def _on_text_change(conn: sqlite3.Connection, question_id: int, prev_text: str) -> None:
+    key = f"question_text_{question_id}"
+    text = st.session_state[key].strip()
+    if text:
+        questions_repo.update_text(conn, question_id, text)
+    else:
+        # Pusta treść: przywracamy poprzednią wartość, żeby widget nie
+        # rozjechał się z bazą (ten sam wzorzec co przy tytule taska).
+        st.session_state[key] = prev_text
+        st.toast("Treść pytania nie może być pusta", icon="⚠️")
+
+
+def _on_type_change(conn: sqlite3.Connection, question_id: int) -> None:
+    questions_repo.update_type(
+        conn, question_id, st.session_state[f"question_type_edit_{question_id}"]
+    )
+
+
+def _on_phase_change(
+    conn: sqlite3.Connection, question_id: int, options: dict[str, int | None]
+) -> None:
+    # Strona grupuje pytania po fazach w expanderach, więc po tej zmianie
+    # pytanie znika z bieżącego expandera i pojawia się w docelowym.
+    # To zamierzone, nie zgubienie danych.
+    label = st.session_state[f"question_phase_{question_id}"]
+    questions_repo.update_phase(conn, question_id, options[label])
+
+
+def render_question_row(
+    conn: sqlite3.Connection, question: sqlite3.Row, phases: list[sqlite3.Row]
+) -> None:
     question_id = question["id"]
     confirm_key = f"confirm_delete_question_{question_id}"
+    options = phase_options(phases)
 
     col_text, col_type, col_delete = st.columns([0.6, 0.2, 0.2])
 
     with col_text:
-        st.markdown(f"**{question['question_text']}**")
+        st.text_area(
+            "Treść pytania",
+            value=question["question_text"],
+            key=f"question_text_{question_id}",
+            on_change=_on_text_change,
+            args=(conn, question_id, question["question_text"]),
+            height=80,
+            label_visibility="collapsed",
+        )
     with col_type:
-        question_type = question["question_type"]
-        st.badge(
-            QUESTION_TYPE_LABELS.get(question_type, question_type),
-            color=QUESTION_TYPE_BADGE_COLORS.get(question_type, "gray"),
+        type_keys = list(QUESTION_TYPE_LABELS.keys())
+        st.selectbox(
+            "Typ",
+            options=type_keys,
+            index=type_keys.index(question["question_type"]),
+            format_func=lambda key: QUESTION_TYPE_LABELS[key],
+            key=f"question_type_edit_{question_id}",
+            on_change=_on_type_change,
+            args=(conn, question_id),
+            label_visibility="collapsed",
+        )
+        option_labels = list(options.keys())
+        st.selectbox(
+            "Faza",
+            options=option_labels,
+            index=option_labels.index(phase_label(options, question["phase_id"])),
+            key=f"question_phase_{question_id}",
+            on_change=_on_phase_change,
+            args=(conn, question_id, options),
+            label_visibility="collapsed",
         )
     with col_delete:
         if st.session_state.get(confirm_key):
@@ -109,7 +165,7 @@ def render_add_question_form(conn: sqlite3.Connection, phase_id: int) -> None:
 
 
 def render_phase_questions_section(
-    conn: sqlite3.Connection, phase: sqlite3.Row
+    conn: sqlite3.Connection, phase: sqlite3.Row, phases: list[sqlite3.Row]
 ) -> None:
     questions = questions_repo.list_by_phase(conn, phase["id"])
 
@@ -117,6 +173,6 @@ def render_phase_questions_section(
         if not questions:
             st.caption("Brak pytań - dodaj pierwsze poniżej.")
         for question in questions:
-            render_question_row(conn, question)
+            render_question_row(conn, question, phases)
 
         render_add_question_form(conn, phase["id"])
