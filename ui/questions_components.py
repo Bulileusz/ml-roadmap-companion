@@ -22,6 +22,14 @@ def _on_text_change(conn: sqlite3.Connection, question_id: int, prev_text: str) 
         st.toast("Treść pytania nie może być pusta", icon="⚠️")
 
 
+def _on_answer_change(conn: sqlite3.Connection, question_id: int) -> None:
+    # Pusta odpowiedź jest dozwolona - to legalny stan "jeszcze nie napisana",
+    # w przeciwieństwie do pustej treści pytania.
+    questions_repo.update_answer(
+        conn, question_id, st.session_state[f"question_answer_{question_id}"]
+    )
+
+
 def _on_type_change(conn: sqlite3.Connection, question_id: int) -> None:
     questions_repo.update_type(
         conn, question_id, st.session_state[f"question_type_edit_{question_id}"]
@@ -83,6 +91,15 @@ def render_question_row(
             on_change=_on_phase_change,
             args=(conn, question_id, options),
         )
+        st.text_area(
+            "Odpowiedź / wyjaśnienie",
+            value=question["answer"],
+            key=f"question_answer_{question_id}",
+            on_change=_on_answer_change,
+            args=(conn, question_id),
+            height=160,
+            placeholder="czego dowodzi to pytanie, na co zwrócić uwagę...",
+        )
         st.divider()
         if st.session_state.get(confirm_key):
             st.caption("Na pewno usunąć to pytanie razem z historią podejść?")
@@ -102,6 +119,9 @@ def render_question_row(
     attempts = question_attempts_repo.list_by_question(conn, question_id)
     summary = question_stats.summarize_attempts(attempts)
 
+    reveal_key = f"reveal_answer_{question_id}"
+    answer = question["answer"].strip()
+
     with st.container(horizontal=True):
         if st.button(
             "✅ Samodzielnie",
@@ -109,6 +129,7 @@ def render_question_row(
             help="Rozwiązałem samodzielnie",
         ):
             activity.record_question_attempt(conn, question, True)
+            st.session_state[reveal_key] = False
             st.rerun()
         if st.button(
             "📖 Sprawdziłem",
@@ -116,6 +137,24 @@ def render_question_row(
             help="Musiałem sprawdzić rozwiązanie",
         ):
             activity.record_question_attempt(conn, question, False)
+            # Kliknięcie "sprawdziłem" bez pokazania odpowiedzi nie miałoby
+            # sensu - odsłaniamy ją od razu, bo po to się tu kliknęło.
+            st.session_state[reveal_key] = True
+            st.rerun()
+        if answer and not st.session_state.get(reveal_key):
+            if st.button("💡 Pokaż odpowiedź", key=f"reveal_{question_id}"):
+                st.session_state[reveal_key] = True
+                st.rerun()
+
+    if not answer:
+        st.caption(
+            "Brak odpowiedzi — dopisz ją w `content/questions/`, "
+            "albo tutaj przez ✏️ Edytuj."
+        )
+    elif st.session_state.get(reveal_key):
+        st.info(answer)
+        if st.button("Ukryj odpowiedź", key=f"hide_{question_id}"):
+            st.session_state[reveal_key] = False
             st.rerun()
 
     if summary["total"] == 0:

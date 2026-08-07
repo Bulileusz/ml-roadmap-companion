@@ -168,10 +168,22 @@ def _migration_3_content_imports(conn: sqlite3.Connection) -> None:
     conn.execute(_CREATE_CONTENT_IMPORTS)
 
 
+def _migration_4_question_answer(conn: sqlite3.Connection) -> None:
+    # Bank pytań bez odpowiedzi był ślepym zaułkiem: przycisk "musiałem
+    # sprawdzić rozwiązanie" nie miał gdzie odesłać. SQLite pozwala na
+    # ADD COLUMN ze stałym defaultem, więc istniejące wiersze dostają ''.
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(questions)").fetchall()
+    }
+    if "answer" not in columns:
+        conn.execute("ALTER TABLE questions ADD COLUMN answer TEXT NOT NULL DEFAULT ''")
+
+
 MIGRATIONS = [
     _migration_1_initial_schema,
     _migration_2_activity_log,
     _migration_3_content_imports,
+    _migration_4_question_answer,
 ]
 
 

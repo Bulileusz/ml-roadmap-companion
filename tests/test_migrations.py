@@ -101,6 +101,51 @@ def test_backfill_does_not_duplicate_when_migrations_replay(tmp_path):
     old.close()
 
 
+def test_v3_db_gains_answer_column_with_empty_default(tmp_path):
+    old = get_connection(tmp_path / "v3.db")
+    for migration in MIGRATIONS[:3]:
+        migration(old)
+    old.execute("PRAGMA user_version = 3")
+    old.execute("INSERT INTO phases (code, name) VALUES ('0', 'Faza 0')")
+    old.execute(
+        "INSERT INTO questions (id, phase_id, question_text, question_type) "
+        "VALUES (5, 1, 'Stare pytanie', 'concept')"
+    )
+    old.commit()
+    columns = {row["name"] for row in old.execute("PRAGMA table_info(questions)")}
+    assert "answer" not in columns
+
+    init_db(old)
+
+    assert _user_version(old) == len(MIGRATIONS)
+    row = old.execute("SELECT * FROM questions WHERE id = 5").fetchone()
+    # Istniejące pytanie dostaje pustą odpowiedź, a nie NULL - import z
+    # content/ rozpoznaje po tym, że można ją uzupełnić.
+    assert row["answer"] == ""
+    assert row["question_text"] == "Stare pytanie"
+    old.close()
+
+
+def test_answer_migration_is_idempotent(tmp_path):
+    conn = get_connection(tmp_path / "idem.db")
+    init_db(conn)
+    conn.execute("INSERT INTO phases (code, name) VALUES ('0', 'Faza 0')")
+    conn.execute(
+        "INSERT INTO questions (phase_id, question_text, question_type, answer) "
+        "VALUES (1, 'Pytanie', 'concept', 'Odpowiedź')"
+    )
+    conn.commit()
+
+    # Powtórne przejechanie migracji (ścieżka adopcji) nie może wywalić się na
+    # istniejącej kolumnie ani skasować zapisanej odpowiedzi.
+    MIGRATIONS[3](conn)
+
+    assert conn.execute("SELECT answer FROM questions").fetchone()["answer"] == (
+        "Odpowiedź"
+    )
+    conn.close()
+
+
 def test_legacy_db_without_user_version_is_adopted(tmp_path):
     # Baza sprzed wersjonowania: tabele istnieją, user_version = 0.
     legacy = get_connection(tmp_path / "legacy.db")

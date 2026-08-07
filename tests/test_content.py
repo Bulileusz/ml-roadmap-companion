@@ -207,6 +207,77 @@ def test_same_text_in_two_phases_is_two_entries(seeded, content_root):
     assert result.flashcards_added == 2
 
 
+def test_question_body_becomes_the_answer(seeded, content_root):
+    _write(
+        content_root,
+        "questions",
+        "0-python.md",
+        "## Czym jest broadcasting?\nRozciąganiem wymiarów o rozmiarze 1.\n",
+    )
+
+    content.sync(seeded, content_root)
+
+    phase_id = seeded.execute("SELECT id FROM phases WHERE code = '0'").fetchone()["id"]
+    question = questions_repo.list_by_phase(seeded, phase_id)[0]
+    assert question["question_text"] == "Czym jest broadcasting?"
+    assert question["answer"] == "Rozciąganiem wymiarów o rozmiarze 1."
+
+
+def test_question_without_body_gets_empty_answer(seeded, content_root):
+    _write(content_root, "questions", "0-python.md", "## Pytanie bez odpowiedzi\n")
+
+    content.sync(seeded, content_root)
+
+    phase_id = seeded.execute("SELECT id FROM phases WHERE code = '0'").fetchone()["id"]
+    assert questions_repo.list_by_phase(seeded, phase_id)[0]["answer"] == ""
+
+
+def test_sync_fills_a_missing_answer_on_an_already_imported_question(
+    seeded, content_root
+):
+    # Tak wygląda realny scenariusz: 56 pytań wjechało bez odpowiedzi, potem
+    # odpowiedzi dopisano do plików. Normalny import by je pominął.
+    _write(content_root, "questions", "0-python.md", "## Pytanie\n")
+    content.sync(seeded, content_root)
+    phase_id = seeded.execute("SELECT id FROM phases WHERE code = '0'").fetchone()["id"]
+    assert questions_repo.list_by_phase(seeded, phase_id)[0]["answer"] == ""
+
+    _write(content_root, "questions", "0-python.md", "## Pytanie\nDopisana treść.\n")
+    result = content.sync(seeded, content_root)
+
+    assert result.answers_filled == 1
+    assert result.questions_added == 0
+    questions = questions_repo.list_by_phase(seeded, phase_id)
+    assert len(questions) == 1
+    assert questions[0]["answer"] == "Dopisana treść."
+
+
+def test_sync_never_overwrites_an_answer_edited_in_the_app(seeded, content_root):
+    _write(content_root, "questions", "0-python.md", "## Pytanie\nZ pliku.\n")
+    content.sync(seeded, content_root)
+    phase_id = seeded.execute("SELECT id FROM phases WHERE code = '0'").fetchone()["id"]
+    question_id = questions_repo.list_by_phase(seeded, phase_id)[0]["id"]
+    questions_repo.update_answer(seeded, question_id, "Moja własna wersja.")
+
+    _write(content_root, "questions", "0-python.md", "## Pytanie\nInna z pliku.\n")
+    result = content.sync(seeded, content_root)
+
+    assert result.answers_filled == 0
+    assert (
+        questions_repo.list_by_phase(seeded, phase_id)[0]["answer"]
+        == "Moja własna wersja."
+    )
+
+
+def test_blank_answer_in_file_does_not_count_as_filled(seeded, content_root):
+    _write(content_root, "questions", "0-python.md", "## Pytanie\n")
+    content.sync(seeded, content_root)
+
+    result = content.sync(seeded, content_root)
+
+    assert result.answers_filled == 0
+
+
 def test_unknown_phase_code_is_reported_not_raised(seeded, content_root):
     _write(content_root, "flashcards", "9-nieznana.md", "## Przód\nTył\n")
 

@@ -28,17 +28,22 @@ Tył może mieć wiele akapitów, listy i kod — cokolwiek do następnego `##`.
 
 ### Pytania — `content/questions/`
 
-Nagłówek `##` to treść pytania. Opcjonalny tag `[code]` albo `[concept]`
-na początku ustawia typ (domyślnie `concept`):
+Nagłówek `##` to treść pytania, tekst pod spodem to **odpowiedź / wyjaśnienie**.
+Opcjonalny tag `[code]` albo `[concept]` na początku ustawia typ (domyślnie
+`concept`):
 
 ```markdown
 ## Dlaczego accuracy bywa myląca przy rzadkiej klasie?
+Przy 1% przypadków pozytywnych model odpowiadający zawsze "nie" ma 99%
+accuracy i zerową wartość. Patrz na recall, precision i PR AUC.
 
 ## [code] Zaimplementuj KNN od zera i porównaj z sklearn.
+Rozjazdy biorą się z remisów przy parzystym k.
 ```
 
-Tekst pod nagłówkiem pytania **nie trafia do bazy** — schemat `questions`
-nie ma na niego kolumny. Możesz tam trzymać notatki dla siebie.
+Odpowiedź jest opcjonalna — pytanie bez treści pod spodem jest w porządku,
+tylko przycisk „💡 Pokaż odpowiedź" się nie pojawi, dopóki jej nie dopiszesz
+(w pliku albo w aplikacji przez ✏️ Edytuj).
 
 ## Zasady importu
 
@@ -51,6 +56,10 @@ Import jest **addytywny i jednokierunkowy**. Konkretnie:
 - **Nie nadpisuje.** Kluczem jest przód fiszki (albo treść pytania).
   Poprawka **tyłu** w pliku nie trafi do bazy, bo klucz się nie zmienił.
   Zmiana **przodu** tworzy nową pozycję, starą skasuj w aplikacji.
+- **Wypełnia puste.** Jedyny wyjątek od reguły wyżej: jeśli pytanie istnieje,
+  a jego odpowiedź jest **pusta**, import ją uzupełni. Odpowiedzi, którą
+  napisałeś sam w aplikacji, nie ruszy. Import wypełnia luki, nigdy nie
+  zastępuje twojej treści.
 
 Praktyczny wniosek: **przód pisz w pliku, tył dopracowuj w aplikacji** —
 albo, jeśli wolisz trzymać wszystko w gicie, zmieniaj tył w pliku i kasuj

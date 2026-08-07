@@ -27,6 +27,7 @@ _TYPE_TAG = re.compile(r"^\[(\w+)\]\s*(.*)$")
 class SyncResult:
     flashcards_added: int = 0
     questions_added: int = 0
+    answers_filled: int = 0
     skipped: int = 0
     warnings: list[str] = field(default_factory=list)
 
@@ -70,6 +71,14 @@ def split_type_tag(heading: str) -> tuple[str, str]:
 
 def _markdown_files(directory: Path) -> list[Path]:
     return sorted(directory.glob("*.md")) if directory.is_dir() else []
+
+
+def _phase_code_of(phase_ids: dict[str, int], phase_id: int | None) -> str:
+    """Odwrotność mapy kod -> id; pytanie bez fazy dostaje pusty kod."""
+    for code, known_id in phase_ids.items():
+        if known_id == phase_id:
+            return code
+    return ""
 
 
 def _sync_flashcards(
@@ -118,6 +127,15 @@ def _sync_questions(
     conn: sqlite3.Connection, root: Path, phase_ids: dict[str, int], result: SyncResult
 ) -> None:
     seen = content_imports_repo.imported_keys(conn, content_imports_repo.KIND_QUESTION)
+    # Pytania czekające na odpowiedź, po znormalizowanej treści -> wiersz.
+    # Pozwala uzupełnić brakującą odpowiedź w pozycji, która jest już
+    # w ewidencji i normalnym trybem zostałaby po prostu pominięta.
+    awaiting_answer = {
+        normalize_key(
+            _phase_code_of(phase_ids, row["phase_id"]), row["question_text"]
+        ): row
+        for row in questions_repo.list_without_answer(conn)
+    }
 
     for path in _markdown_files(root / "questions"):
         code = phase_code_from_filename(path)
@@ -127,9 +145,8 @@ def _sync_questions(
             )
             continue
 
-        # Treść pod nagłówkiem pytania jest ignorowana - schemat questions nie
-        # ma na nią kolumny, więc służy jako notatka dla ciebie w pliku.
-        for heading, _ in parse_sections(path.read_text(encoding="utf-8")):
+        # Treść pod nagłówkiem pytania to odpowiedź/wyjaśnienie.
+        for heading, answer in parse_sections(path.read_text(encoding="utf-8")):
             question_type, text = split_type_tag(heading)
             if not text:
                 continue
@@ -137,9 +154,18 @@ def _sync_questions(
             key = normalize_key(code, text)
             if key in seen:
                 result.skipped += 1
+                # Wyjątek od "nie nadpisujemy": pustą odpowiedź wolno
+                # uzupełnić. Import wypełnia luki, nigdy nie zastępuje treści,
+                # którą sam poprawiłeś w aplikacji.
+                existing = awaiting_answer.pop(key, None)
+                if existing is not None and answer:
+                    questions_repo.update_answer(conn, existing["id"], answer)
+                    result.answers_filled += 1
                 continue
 
-            questions_repo.create(conn, phase_ids[code], text, question_type)
+            questions_repo.create(
+                conn, phase_ids[code], text, question_type, answer=answer
+            )
             content_imports_repo.mark_imported(
                 conn, content_imports_repo.KIND_QUESTION, key
             )

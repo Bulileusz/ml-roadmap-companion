@@ -36,7 +36,9 @@ python -m pytest
   oznaczanie "rozwiązałem samodzielnie" / "musiałem sprawdzić", pełny log
   dat podejść (`question_attempts`) i skumulowany wskaźnik: % podejść
   rozwiązanych samodzielnie, liczony ze wszystkich podejść (bez okna
-  czasowego). Treść, typ i faza istniejącego pytania są edytowalne w miejscu.
+  czasowego). **Każde pytanie ma odpowiedź** — przycisk „💡 Pokaż odpowiedź"
+  odsłania ją na żądanie, a kliknięcie „📖 Sprawdziłem" odsłania od razu, bo po
+  to się je klika. Treść, typ, faza i odpowiedź są edytowalne w miejscu.
   Zmiana fazy przenosi pytanie między expanderami — to zamierzone.
 - **Moduł 4 (gotowy)** — dziennik nauki: każde odhaczenie zadania, powtórka
   fiszki i podejście do pytania trafia do `activity_log`. Strona 📔 Dziennik
