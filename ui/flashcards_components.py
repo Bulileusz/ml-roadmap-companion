@@ -121,60 +121,56 @@ def render_flashcard_edit_row(
     confirm_key = f"confirm_delete_card_{card_id}"
     options = phase_options(phases)
 
-    col_front, col_back, col_delete = st.columns([0.4, 0.45, 0.15])
-
-    with col_front:
-        st.text_input(
-            "Przód",
-            value=card["front"],
-            key=f"front_{card_id}",
-            on_change=_on_content_change,
-            args=(conn, card_id, card["front"], card["back"]),
-            label_visibility="collapsed",
-        )
-    with col_back:
-        st.text_input(
-            "Tył",
-            value=card["back"],
-            key=f"back_{card_id}",
-            on_change=_on_content_change,
-            args=(conn, card_id, card["front"], card["back"]),
-            label_visibility="collapsed",
-        )
-    with col_delete:
-        if st.session_state.get(confirm_key):
-            c1, c2 = st.columns(2)
-            if c1.button("Tak", key=f"card_delete_yes_{card_id}"):
-                flashcards_repo.delete(conn, card_id)
-                st.session_state[confirm_key] = False
-                st.rerun()
-            if c2.button("Anuluj", key=f"card_delete_no_{card_id}"):
-                st.session_state[confirm_key] = False
-                st.rerun()
-        else:
-            if st.button("🗑️", key=f"card_delete_{card_id}"):
-                st.session_state[confirm_key] = True
-                st.rerun()
-
-    col_phase, col_meta = st.columns([0.4, 0.6])
-    with col_phase:
-        option_labels = list(options.keys())
-        st.selectbox(
-            "Faza",
-            options=option_labels,
-            index=option_labels.index(phase_label(options, card["phase_id"])),
-            key=f"card_phase_{card_id}",
-            on_change=_on_card_phase_change,
-            args=(conn, card_id, options),
-            label_visibility="collapsed",
-        )
-    with col_meta:
-        box_color = BOX_BADGE_COLORS.get(card["box"], "gray")
-        st.caption(
+    # Na liście widać przód i stan pudełka; przód/tył/faza/usuwanie chowają
+    # się w popoverze, żeby 76 fiszek nie było 76 razy po ~250 px.
+    box_color = BOX_BADGE_COLORS.get(card["box"], "gray")
+    with st.container(horizontal=True, vertical_alignment="center"):
+        st.markdown(
             f":{box_color}-badge[📦 {card['box']}/{spaced_repetition.MAX_BOX}] "
-            f"· następna powtórka: {card['next_review_at']}"
+            f"**{card['front']}**",
+            width="stretch",
         )
-    st.divider()
+        with st.popover("✏️", width="content"):
+            st.text_input(
+                "Przód",
+                value=card["front"],
+                key=f"front_{card_id}",
+                on_change=_on_content_change,
+                args=(conn, card_id, card["front"], card["back"]),
+            )
+            st.text_area(
+                "Tył",
+                value=card["back"],
+                key=f"back_{card_id}",
+                on_change=_on_content_change,
+                args=(conn, card_id, card["front"], card["back"]),
+                height=120,
+            )
+            option_labels = list(options.keys())
+            st.selectbox(
+                "Faza",
+                options=option_labels,
+                index=option_labels.index(phase_label(options, card["phase_id"])),
+                key=f"card_phase_{card_id}",
+                on_change=_on_card_phase_change,
+                args=(conn, card_id, options),
+            )
+            st.caption(f"Następna powtórka: {card['next_review_at']}")
+            st.divider()
+            if st.session_state.get(confirm_key):
+                st.caption("Na pewno usunąć tę fiszkę?")
+                with st.container(horizontal=True):
+                    if st.button("Tak, usuń", key=f"card_delete_yes_{card_id}"):
+                        flashcards_repo.delete(conn, card_id)
+                        st.session_state[confirm_key] = False
+                        st.rerun()
+                    if st.button("Anuluj", key=f"card_delete_no_{card_id}"):
+                        st.session_state[confirm_key] = False
+                        st.rerun()
+            else:
+                if st.button("🗑️ Usuń fiszkę", key=f"card_delete_{card_id}"):
+                    st.session_state[confirm_key] = True
+                    st.rerun()
 
 
 def render_all_flashcards_list(

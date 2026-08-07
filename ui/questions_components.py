@@ -45,29 +45,34 @@ def render_question_row(
     confirm_key = f"confirm_delete_question_{question_id}"
     options = phase_options(phases)
 
-    col_text, col_type, col_delete = st.columns([0.6, 0.2, 0.2])
+    # Domyślnie widać samą treść i akcje. Edycja (typ, faza, usuwanie) siedzi
+    # w popoverze, bo rozłożona na stałe zajmowała na telefonie ~250 px na
+    # każde pytanie - faza z 12 pytaniami to było 5000 px przewijania.
+    question_type = question["question_type"]
+    st.markdown(
+        f":{QUESTION_TYPE_BADGE_COLORS.get(question_type, 'gray')}-badge"
+        f"[{QUESTION_TYPE_LABELS.get(question_type, question_type)}] "
+        f"**{question['question_text']}**"
+    )
 
-    with col_text:
+    with st.popover("✏️ Edytuj", width="content"):
         st.text_area(
             "Treść pytania",
             value=question["question_text"],
             key=f"question_text_{question_id}",
             on_change=_on_text_change,
             args=(conn, question_id, question["question_text"]),
-            height=80,
-            label_visibility="collapsed",
+            height=120,
         )
-    with col_type:
         type_keys = list(QUESTION_TYPE_LABELS.keys())
         st.selectbox(
             "Typ",
             options=type_keys,
-            index=type_keys.index(question["question_type"]),
+            index=type_keys.index(question_type),
             format_func=lambda key: QUESTION_TYPE_LABELS[key],
             key=f"question_type_edit_{question_id}",
             on_change=_on_type_change,
             args=(conn, question_id),
-            label_visibility="collapsed",
         )
         option_labels = list(options.keys())
         st.selectbox(
@@ -77,46 +82,52 @@ def render_question_row(
             key=f"question_phase_{question_id}",
             on_change=_on_phase_change,
             args=(conn, question_id, options),
-            label_visibility="collapsed",
         )
-    with col_delete:
+        st.divider()
         if st.session_state.get(confirm_key):
-            c1, c2 = st.columns(2)
-            if c1.button("Tak", key=f"question_delete_yes_{question_id}"):
-                questions_repo.delete(conn, question_id)
-                st.session_state[confirm_key] = False
-                st.rerun()
-            if c2.button("Anuluj", key=f"question_delete_no_{question_id}"):
-                st.session_state[confirm_key] = False
-                st.rerun()
+            st.caption("Na pewno usunąć to pytanie razem z historią podejść?")
+            with st.container(horizontal=True):
+                if st.button("Tak, usuń", key=f"question_delete_yes_{question_id}"):
+                    questions_repo.delete(conn, question_id)
+                    st.session_state[confirm_key] = False
+                    st.rerun()
+                if st.button("Anuluj", key=f"question_delete_no_{question_id}"):
+                    st.session_state[confirm_key] = False
+                    st.rerun()
         else:
-            if st.button("🗑️", key=f"question_delete_{question_id}"):
+            if st.button("🗑️ Usuń pytanie", key=f"question_delete_{question_id}"):
                 st.session_state[confirm_key] = True
                 st.rerun()
 
     attempts = question_attempts_repo.list_by_question(conn, question_id)
     summary = question_stats.summarize_attempts(attempts)
 
-    col_solo, col_checked, col_summary = st.columns([0.3, 0.35, 0.35])
-    with col_solo:
-        if st.button("✅ Rozwiązałem samodzielnie", key=f"solo_{question_id}"):
+    with st.container(horizontal=True):
+        if st.button(
+            "✅ Samodzielnie",
+            key=f"solo_{question_id}",
+            help="Rozwiązałem samodzielnie",
+        ):
             activity.record_question_attempt(conn, question, True)
             st.rerun()
-    with col_checked:
-        if st.button("📖 Musiałem sprawdzić rozwiązanie", key=f"checked_{question_id}"):
+        if st.button(
+            "📖 Sprawdziłem",
+            key=f"checked_{question_id}",
+            help="Musiałem sprawdzić rozwiązanie",
+        ):
             activity.record_question_attempt(conn, question, False)
             st.rerun()
-    with col_summary:
-        if summary["total"] == 0:
-            st.caption("Brak podejść jeszcze.")
-        else:
-            st.progress(
-                summary["pct"] / 100,
-                text=(
-                    f"{summary['independent']}/{summary['total']} samodzielnie "
-                    f"({int(summary['pct'])}%)"
-                ),
-            )
+
+    if summary["total"] == 0:
+        st.caption("Brak podejść jeszcze.")
+    else:
+        st.progress(
+            summary["pct"] / 100,
+            text=(
+                f"{summary['independent']}/{summary['total']} samodzielnie "
+                f"({int(summary['pct'])}%)"
+            ),
+        )
 
     if attempts:
         with st.expander(f"Historia podejść ({len(attempts)})"):
