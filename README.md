@@ -47,12 +47,21 @@ python -m pytest
   Seria liczy się jako żywa również wtedy, gdy ostatnia aktywność była
   wczoraj — inaczej znikałaby o północy, zanim dzisiejszy dzień nauki się
   zacznie.
+- **Moduł 5 (gotowy)** — zasoby: materiały do nauki podpięte do faz
+  (książka, kurs, wideo, dokumentacja, artykuł), z linkiem, opisem/rozdziałem
+  i statusem przerobienia. Roadmapa mówi **co** zrobić, ta strona **z czego**.
+  Startowy zestaw to 44 pozycje — ISLR, Mathematics for ML, User Guide
+  scikit-learn, tutoriale PyTorcha, d2l.ai i inne.
+- **Moduł 6 (do przemyślenia)** — tryb stricte pod naukę: przebieg
+  zapoznawczy dla nowych fiszek i notatki własnymi słowami. Szkic i otwarte
+  pytania w `docs/modul-nauki.md`, kodu jeszcze nie ma.
 
 ## Materiały do nauki (`content/`)
 
-Fiszki i pytania trzymane są **w repo**, w katalogu `content/` — plik
-Markdown na fazę, nagłówek `##` to przód fiszki (albo treść pytania),
-tekst pod spodem to tył. Aplikacja wczytuje ten katalog przy każdym
+Fiszki, pytania i materiały trzymane są **w repo**, w katalogu `content/` —
+plik Markdown na fazę, nagłówek `##` to przód fiszki (albo treść pytania,
+albo tytuł materiału), tekst pod spodem to tył (albo odpowiedź, albo
+link i opis). Aplikacja wczytuje ten katalog przy każdym
 starcie, więc fiszka dopisana do pliku — choćby z telefonu, przez webowy
 edytor GitHuba — trafia do bazy przy następnym uruchomieniu.
 
@@ -87,12 +96,13 @@ jest odrzucany zamiast wczytywany po cichu.
 
 ```
 app.py            strona "Roadmap" (streamlit run app.py)
-pages/             kolejne strony multipage (Fiszki, Pytania, Dziennik, Dane)
+pages/             kolejne strony multipage (Fiszki, Pytania, Dziennik, Dane, Zasoby)
 db/               połączenie SQLite, schema, dane startowe (seed), bootstrap
-repository/       CRUD na tabelach (phases, tasks, flashcards, questions, question_attempts, activity_log)
+repository/       CRUD na tabelach (phases, tasks, flashcards, questions, question_attempts, activity_log, resources)
 services/         logika biznesowa (postęp, spaced repetition, statystyki pytań, serie dni, backup)
 ui/               funkcje renderujące widgety Streamlit
-content/          fiszki i pytania w Markdownie, wczytywane przy starcie
+content/          fiszki, pytania i materiały w Markdownie, wczytywane przy starcie
+docs/             notatki projektowe (m.in. szkic modułu nauki)
 tests/            testy pytest (logika, repozytoria, migracje, seed)
 data/             plik roadmap.db (nieśledzony w git)
 ```

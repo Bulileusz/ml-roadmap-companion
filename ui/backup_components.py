@@ -13,7 +13,9 @@ TABLE_LABELS = {
     "flashcards": "fiszki",
     "questions": "pytania",
     "question_attempts": "podejścia do pytań",
+    "resources": "materiały",
     "activity_log": "wpisy dziennika",
+    "content_imports": "wpisy ewidencji importu",
 }
 
 
@@ -35,30 +37,31 @@ def render_content_section(conn: sqlite3.Connection) -> None:
     imported = content_imports_repo.count_by_kind(conn)
 
     with st.container(border=True):
-        col_cards, col_questions = st.columns(2)
-        col_cards.metric(
-            "Fiszki w plikach",
-            available["flashcards"],
-            delta=f"zaimportowano {imported.get('flashcard', 0)}",
-            delta_color="off",
-            border=True,
-        )
-        col_questions.metric(
-            "Pytania w plikach",
-            available["questions"],
-            delta=f"zaimportowano {imported.get('question', 0)}",
-            delta_color="off",
-            border=True,
-        )
+        with st.container(horizontal=True):
+            for label, available_key, imported_key in (
+                ("Fiszki", "flashcards", "flashcard"),
+                ("Pytania", "questions", "question"),
+                ("Materiały", "resources", "resource"),
+            ):
+                st.metric(
+                    f"{label} w plikach",
+                    available[available_key],
+                    delta=f"zaimportowano {imported.get(imported_key, 0)}",
+                    delta_color="off",
+                    border=True,
+                    width=170,
+                )
 
         if st.button("🔄 Wczytaj materiały teraz"):
             result = content.sync(conn)
             for warning in result.warnings:
                 st.warning(warning)
-            if result.total_added:
+            if result.total_added or result.answers_filled:
                 st.success(
-                    f"Dodano {result.flashcards_added} fiszek "
-                    f"i {result.questions_added} pytań."
+                    f"Dodano {result.flashcards_added} fiszek, "
+                    f"{result.questions_added} pytań i "
+                    f"{result.resources_added} materiałów; "
+                    f"uzupełniono {result.answers_filled} odpowiedzi."
                 )
             else:
                 st.info(f"Nic nowego — {result.skipped} pozycji już w bazie.")

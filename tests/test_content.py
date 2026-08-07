@@ -324,5 +324,11 @@ def test_ledger_records_every_import(seeded, content_root):
 def test_available_counts_reads_files_without_touching_db(content_root):
     _write(content_root, "flashcards", "0-python.md", "## A\n1\n\n## B\n2\n")
     _write(content_root, "questions", "0-python.md", "## P1\n\n## P2\n\n## P3\n")
+    (content_root / "resources").mkdir()
+    _write(content_root, "resources", "0-python.md", "## Materiał\n")
 
-    assert content.available_counts(content_root) == {"flashcards": 2, "questions": 3}
+    assert content.available_counts(content_root) == {
+        "flashcards": 2,
+        "questions": 3,
+        "resources": 1,
+    }

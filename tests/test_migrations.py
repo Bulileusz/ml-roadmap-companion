@@ -8,6 +8,8 @@ ALL_TABLES = {
     "questions",
     "question_attempts",
     "activity_log",
+    "content_imports",
+    "resources",
 }
 
 
@@ -143,6 +145,52 @@ def test_answer_migration_is_idempotent(tmp_path):
     assert conn.execute("SELECT answer FROM questions").fetchone()["answer"] == (
         "Odpowiedź"
     )
+    conn.close()
+
+
+def test_v4_db_gains_resources_and_keeps_the_import_ledger(tmp_path):
+    old = get_connection(tmp_path / "v4.db")
+    for migration in MIGRATIONS[:4]:
+        migration(old)
+    old.execute("PRAGMA user_version = 4")
+    old.execute(
+        "INSERT INTO content_imports (kind, item_key, created_at) "
+        "VALUES ('flashcard', '0|coś', '2026-01-01 10:00:00')"
+    )
+    old.commit()
+    assert "resources" not in _table_names(old)
+
+    init_db(old)
+
+    assert _user_version(old) == len(MIGRATIONS)
+    assert "resources" in _table_names(old)
+    # Przebudowa content_imports musi zachować wiersze - inaczej cały starter
+    # wjechałby drugi raz przy najbliższym starcie.
+    rows = old.execute("SELECT * FROM content_imports").fetchall()
+    assert [(r["kind"], r["item_key"]) for r in rows] == [("flashcard", "0|coś")]
+    # CHECK na kind zniknął, więc nowy rodzaj przechodzi.
+    old.execute(
+        "INSERT INTO content_imports (kind, item_key, created_at) "
+        "VALUES ('resource', '0|islr', '2026-01-01 10:00:00')"
+    )
+    old.commit()
+    old.close()
+
+
+def test_content_imports_rebuild_runs_only_once(tmp_path):
+    conn = get_connection(tmp_path / "rebuild.db")
+    init_db(conn)
+    conn.execute(
+        "INSERT INTO content_imports (kind, item_key, created_at) "
+        "VALUES ('resource', '0|islr', '2026-01-01 10:00:00')"
+    )
+    conn.commit()
+
+    # Powtórne przejechanie migracji nie może wyczyścić ewidencji.
+    MIGRATIONS[4](conn)
+
+    count = conn.execute("SELECT COUNT(*) FROM content_imports").fetchone()[0]
+    assert count == 1
     conn.close()
 
 

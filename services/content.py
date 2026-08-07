@@ -4,7 +4,12 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
-from repository import content_imports_repo, phases_repo, questions_repo
+from repository import (
+    content_imports_repo,
+    phases_repo,
+    questions_repo,
+    resources_repo,
+)
 from services import clock, spaced_repetition
 
 CONTENT_ROOT = Path(__file__).resolve().parent.parent / "content"
@@ -27,13 +32,14 @@ _TYPE_TAG = re.compile(r"^\[(\w+)\]\s*(.*)$")
 class SyncResult:
     flashcards_added: int = 0
     questions_added: int = 0
+    resources_added: int = 0
     answers_filled: int = 0
     skipped: int = 0
     warnings: list[str] = field(default_factory=list)
 
     @property
     def total_added(self) -> int:
-        return self.flashcards_added + self.questions_added
+        return self.flashcards_added + self.questions_added + self.resources_added
 
 
 def normalize_key(phase_code: str, text: str) -> str:
@@ -61,12 +67,26 @@ def phase_code_from_filename(path: Path) -> str:
     return path.stem.split("-", 1)[0]
 
 
-def split_type_tag(heading: str) -> tuple[str, str]:
-    """'[code] Napisz pętlę' -> ('code', 'Napisz pętlę'); bez tagu -> concept."""
+def split_type_tag(
+    heading: str, allowed: tuple[str, ...] = QUESTION_TYPES, default: str | None = None
+) -> tuple[str, str]:
+    """'[code] Napisz pętlę' -> ('code', 'Napisz pętlę'); bez tagu -> default.
+
+    Nierozpoznany tag zostaje częścią treści, zamiast po cichu znikać -
+    literówka w '[boook]' ma być widoczna w aplikacji, a nie zjedzona.
+    """
     match = _TYPE_TAG.match(heading)
-    if match and match.group(1) in QUESTION_TYPES:
+    if match and match.group(1) in allowed:
         return match.group(1), match.group(2).strip()
-    return DEFAULT_QUESTION_TYPE, heading
+    return (default or DEFAULT_QUESTION_TYPE), heading
+
+
+def split_url(body: str) -> tuple[str, str]:
+    """Pierwsza linia zaczynająca się od http to link, reszta to opis."""
+    lines = body.splitlines()
+    if lines and lines[0].strip().lower().startswith("http"):
+        return lines[0].strip(), "\n".join(lines[1:]).strip()
+    return "", body.strip()
 
 
 def _markdown_files(directory: Path) -> list[Path]:
@@ -173,6 +193,42 @@ def _sync_questions(
             result.questions_added += 1
 
 
+def _sync_resources(
+    conn: sqlite3.Connection, root: Path, phase_ids: dict[str, int], result: SyncResult
+) -> None:
+    seen = content_imports_repo.imported_keys(conn, content_imports_repo.KIND_RESOURCE)
+
+    for path in _markdown_files(root / "resources"):
+        code = phase_code_from_filename(path)
+        if code not in phase_ids:
+            result.warnings.append(
+                f"{path.name}: nieznany kod fazy '{code}' - pomijam."
+            )
+            continue
+
+        for heading, body in parse_sections(path.read_text(encoding="utf-8")):
+            kind, title = split_type_tag(
+                heading,
+                allowed=resources_repo.KINDS,
+                default=resources_repo.DEFAULT_KIND,
+            )
+            if not title:
+                continue
+
+            key = normalize_key(code, title)
+            if key in seen:
+                result.skipped += 1
+                continue
+
+            url, detail = split_url(body)
+            resources_repo.create(conn, phase_ids[code], title, url, kind, detail)
+            content_imports_repo.mark_imported(
+                conn, content_imports_repo.KIND_RESOURCE, key
+            )
+            seen.add(key)
+            result.resources_added += 1
+
+
 def sync(
     conn: sqlite3.Connection, root: Path | None = None, today: date | None = None
 ) -> SyncResult:
@@ -195,17 +251,18 @@ def sync(
 
     _sync_flashcards(conn, root, phase_ids, result, today or clock.today())
     _sync_questions(conn, root, phase_ids, result)
+    _sync_resources(conn, root, phase_ids, result)
     return result
 
 
 def available_counts(root: Path | None = None) -> dict[str, int]:
     """Ile pozycji leży w plikach - do pokazania obok liczby zaimportowanych."""
     root = root or CONTENT_ROOT
-    counts = {"flashcards": 0, "questions": 0}
+    counts = {"flashcards": 0, "questions": 0, "resources": 0}
     if not root.is_dir():
         return counts
 
-    for kind, directory in (("flashcards", "flashcards"), ("questions", "questions")):
-        for path in _markdown_files(root / directory):
+    for kind in ("flashcards", "questions", "resources"):
+        for path in _markdown_files(root / kind):
             counts[kind] += len(parse_sections(path.read_text(encoding="utf-8")))
     return counts

@@ -13,6 +13,7 @@ TABLES = [
     "flashcards",
     "questions",
     "question_attempts",
+    "resources",
     "activity_log",
     # Bez ewidencji importów w kopii odtworzenie backupu zgubiłoby wiedzę
     # o tym, co już wjechało z content/, i przy najbliższym starcie

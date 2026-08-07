@@ -2,8 +2,13 @@ import sqlite3
 
 from services import clock
 
+# Rodzaje pozycji w ewidencji. Od migracji 5 schemat nie ma na nie CHECK-a,
+# bo lista rośnie z każdym modułem - jej miejsce jest tutaj, przy kodzie,
+# który jej używa.
 KIND_FLASHCARD = "flashcard"
 KIND_QUESTION = "question"
+KIND_RESOURCE = "resource"
+KINDS = (KIND_FLASHCARD, KIND_QUESTION, KIND_RESOURCE)
 
 
 def imported_keys(conn: sqlite3.Connection, kind: str) -> set[str]:
