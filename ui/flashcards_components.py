@@ -4,7 +4,8 @@ import streamlit as st
 
 from repository import flashcards_repo
 from services import spaced_repetition
-from ui.components import NO_PHASE_LABEL, phase_label, phase_options
+from ui.components import NO_PHASE_LABEL, confirm_delete, phase_label, phase_options
+from ui.theme import all_done, answer_surface, badge, empty_state
 
 # Kolor badge'a rośnie z pudełkiem: świeża fiszka szara, opanowana zielona.
 BOX_BADGE_COLORS = {1: "gray", 2: "blue", 3: "violet", 4: "orange", 5: "green"}
@@ -15,7 +16,7 @@ def render_due_today_section(conn: sqlite3.Connection) -> None:
     due = spaced_repetition.get_due_cards(conn)
 
     if not due:
-        st.success("Brak powtórek na dziś! 🎉")
+        all_done("Brak powtórek na dziś!")
         return
 
     card = due[0]
@@ -23,31 +24,32 @@ def render_due_today_section(conn: sqlite3.Connection) -> None:
     reveal_key = f"reveal_{card_id}"
 
     with st.container(border=True):
-        st.badge(f"Zostało dzisiaj: {len(due)}", color="green")
+        st.markdown(badge(f"Zostało dzisiaj: {len(due)}", "green"))
         st.markdown(f"### {card['front']}")
 
         if st.session_state.get(reveal_key):
-            st.info(card["back"])
-            col_wrong, col_right = st.columns(2)
-            if col_wrong.button(
-                "❌ Nie umiałem", key=f"wrong_{card_id}", use_container_width=True
-            ):
-                spaced_repetition.record_review(conn, card_id, correct=False)
-                st.session_state[reveal_key] = False
-                st.rerun()
-            if col_right.button(
-                "✅ Umiałem",
-                key=f"right_{card_id}",
-                type="primary",
-                use_container_width=True,
-            ):
-                spaced_repetition.record_review(conn, card_id, correct=True)
-                st.session_state[reveal_key] = False
-                st.rerun()
+            answer_surface(card["back"], str(card_id))
+            # Kontener poziomy zamiast st.columns(2): na telefonie kolumny
+            # rozjeżdżają ocenę na dwa wiersze, a to najczęściej klikana
+            # para przycisków w całej apce.
+            with st.container(horizontal=True):
+                if st.button(
+                    "❌ Nie umiałem", key=f"wrong_{card_id}", width="stretch"
+                ):
+                    spaced_repetition.record_review(conn, card_id, correct=False)
+                    st.session_state[reveal_key] = False
+                    st.rerun()
+                if st.button(
+                    "✅ Umiałem",
+                    key=f"right_{card_id}",
+                    type="primary",
+                    width="stretch",
+                ):
+                    spaced_repetition.record_review(conn, card_id, correct=True)
+                    st.session_state[reveal_key] = False
+                    st.rerun()
         else:
-            if st.button(
-                "Pokaż odpowiedź", key=f"show_{card_id}", use_container_width=True
-            ):
+            if st.button("Pokaż odpowiedź", key=f"show_{card_id}", width="stretch"):
                 st.session_state[reveal_key] = True
                 st.rerun()
 
@@ -118,16 +120,15 @@ def render_flashcard_edit_row(
     conn: sqlite3.Connection, card: sqlite3.Row, phases: list[sqlite3.Row]
 ) -> None:
     card_id = card["id"]
-    confirm_key = f"confirm_delete_card_{card_id}"
     options = phase_options(phases)
 
     # Na liście widać przód i stan pudełka; przód/tył/faza/usuwanie chowają
     # się w popoverze, żeby 76 fiszek nie było 76 razy po ~250 px.
     box_color = BOX_BADGE_COLORS.get(card["box"], "gray")
+    box_label = f"📦 {card['box']}/{spaced_repetition.MAX_BOX}"
     with st.container(horizontal=True, vertical_alignment="center"):
         st.markdown(
-            f":{box_color}-badge[📦 {card['box']}/{spaced_repetition.MAX_BOX}] "
-            f"**{card['front']}**",
+            f"{badge(box_label, box_color)} **{card['front']}**",
             width="stretch",
         )
         with st.popover("✏️", width="content"):
@@ -157,20 +158,12 @@ def render_flashcard_edit_row(
             )
             st.caption(f"Następna powtórka: {card['next_review_at']}")
             st.divider()
-            if st.session_state.get(confirm_key):
-                st.caption("Na pewno usunąć tę fiszkę?")
-                with st.container(horizontal=True):
-                    if st.button("Tak, usuń", key=f"card_delete_yes_{card_id}"):
-                        flashcards_repo.delete(conn, card_id)
-                        st.session_state[confirm_key] = False
-                        st.rerun()
-                    if st.button("Anuluj", key=f"card_delete_no_{card_id}"):
-                        st.session_state[confirm_key] = False
-                        st.rerun()
-            else:
-                if st.button("🗑️ Usuń fiszkę", key=f"card_delete_{card_id}"):
-                    st.session_state[confirm_key] = True
-                    st.rerun()
+            confirm_delete(
+                "Usuń fiszkę",
+                "Na pewno usunąć tę fiszkę?",
+                f"card_{card_id}",
+                lambda: flashcards_repo.delete(conn, card_id),
+            )
 
 
 def render_all_flashcards_list(
@@ -179,6 +172,6 @@ def render_all_flashcards_list(
     cards = flashcards_repo.list_all(conn)
     with st.expander(f"Wszystkie fiszki ({len(cards)})"):
         if not cards:
-            st.caption("Brak fiszek - dodaj pierwszą powyżej.")
+            empty_state("Brak fiszek — dodaj pierwszą powyżej.")
         for card in cards:
             render_flashcard_edit_row(conn, card, phases)

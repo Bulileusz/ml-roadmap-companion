@@ -5,6 +5,7 @@ import streamlit as st
 
 from repository import activity_repo
 from services import activity, clock, streak
+from ui.theme import METRIC_WIDTH, empty_state
 
 ACTIVITY_LABELS = {
     activity_repo.KIND_TASK_DONE: ("✅", "Zadanie zrobione"),
@@ -17,10 +18,20 @@ ACTIVITY_LABELS = {
 def render_streak_summary(conn: sqlite3.Connection) -> None:
     summary = activity.get_streak(conn)
 
-    col_current, col_longest, col_days = st.columns(3)
-    col_current.metric("Aktualna seria", summary["current"], border=True)
-    col_longest.metric("Rekord", summary["longest"], border=True)
-    col_days.metric("Dni z aktywnością", summary["active_days"], border=True)
+    # Kontener poziomy zamiast st.columns(3) - ten sam powód co na stronie
+    # startowej: kolumny na telefonie układają się jedna pod drugą i sam rząd
+    # metryk zjada ekran, zanim widać dziennik.
+    with st.container(horizontal=True):
+        st.metric(
+            "Aktualna seria", summary["current"], border=True, width=METRIC_WIDTH
+        )
+        st.metric("Rekord", summary["longest"], border=True, width=METRIC_WIDTH)
+        st.metric(
+            "Dni z aktywnością",
+            summary["active_days"],
+            border=True,
+            width=METRIC_WIDTH,
+        )
 
     if summary["current"] == 0 and summary["active_days"] > 0:
         st.caption(
@@ -46,7 +57,7 @@ def render_activity_feed(conn: sqlite3.Connection, limit: int = 100) -> None:
     entries = activity_repo.list_recent(conn, limit)
 
     if not entries:
-        st.caption(
+        empty_state(
             "Dziennik jest pusty. Zapisuje się tu odhaczenie zadania, "
             "powtórka fiszki i podejście do pytania."
         )

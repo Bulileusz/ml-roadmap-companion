@@ -6,6 +6,7 @@ import streamlit as st
 from db.connection import DB_PATH
 from repository import content_imports_repo
 from services import backup, content
+from ui.theme import METRIC_WIDTH
 
 TABLE_LABELS = {
     "phases": "fazy",
@@ -48,8 +49,9 @@ def render_content_section(conn: sqlite3.Connection) -> None:
                     available[available_key],
                     delta=f"zaimportowano {imported.get(imported_key, 0)}",
                     delta_color="off",
+                    delta_arrow="off",
                     border=True,
-                    width=170,
+                    width=METRIC_WIDTH,
                 )
 
         if st.button("🔄 Wczytaj materiały teraz"):

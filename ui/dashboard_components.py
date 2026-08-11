@@ -1,9 +1,6 @@
 import streamlit as st
 
-# Szerokość kafelka metryki w pikselach. Stała, a nie "stretch", bo to ona
-# decyduje, ile kafelków zmieści się w rzędzie przed zawinięciem: przy 390 px
-# ekranu wychodzą dwa, przy szerokim - wszystkie cztery.
-METRIC_WIDTH = 170
+from ui.theme import METRIC_WIDTH, all_done, badge, empty_state
 
 
 def _fiszki_form(n: int) -> str:
@@ -32,12 +29,16 @@ def render_metrics_row(data: dict) -> None:
     # jedna pod drugą i sam rząd metryk zajmuje ~600 px, zanim widać cokolwiek
     # innego. Kontener poziomy zawija, więc na wąskim ekranie wychodzi 2x2,
     # a na szerokim dalej jeden rząd.
+    # delta_arrow="off" przy każdej metryce: delta jest tu podpisem
+    # ("0/26 zadań", "rekord: 0"), a nie zmianą w czasie. Domyślna strzałka
+    # w górę sugerowała wzrost, którego nikt nie liczy.
     with st.container(horizontal=True):
         st.metric(
             "Postęp roadmapy",
             f"{int(roadmap['pct'])}%",
             delta=f"{roadmap['done']}/{roadmap['total']} zadań",
             delta_color="off",
+            delta_arrow="off",
             border=True,
             width=METRIC_WIDTH,
         )
@@ -46,6 +47,7 @@ def render_metrics_row(data: dict) -> None:
             data["due_count"],
             delta=f"{data['cards_total']} {_fiszki_form(data['cards_total'])} łącznie",
             delta_color="off",
+            delta_arrow="off",
             border=True,
             width=METRIC_WIDTH,
         )
@@ -54,6 +56,7 @@ def render_metrics_row(data: dict) -> None:
             ind_value,
             delta=f"{independence['independent']}/{independence['total']} podejść",
             delta_color="off",
+            delta_arrow="off",
             border=True,
             width=METRIC_WIDTH,
         )
@@ -62,6 +65,7 @@ def render_metrics_row(data: dict) -> None:
             f"{streak['current']} {_dni_form(streak['current'])}",
             delta=f"rekord: {streak['longest']}",
             delta_color="off",
+            delta_arrow="off",
             border=True,
             width=METRIC_WIDTH,
         )
@@ -72,10 +76,11 @@ def render_today_section(data: dict) -> None:
     with st.container(border=True):
         task = data["next_task"]
         if task is None:
-            st.markdown("🎉 **Wszystkie zadania roadmapy zrobione!**")
+            all_done("Wszystkie zadania roadmapy zrobione!")
         else:
-            st.badge(task["phase_name"], color="green")
-            st.markdown(f"**{task['title']}**")
+            # Badge i tytuł w jednej linii, nie w dwóch - kafelek "co dziś
+            # robię" jest na starcie strony i nie musi zajmować dwóch wierszy.
+            st.markdown(f"{badge(task['phase_name'], 'green')} **{task['title']}**")
         if data["due_count"] > 0:
             st.page_link(
                 "pages/1_🃏_Fiszki.py",
@@ -89,7 +94,7 @@ def render_leitner_boxes(data: dict) -> None:
     total = data["cards_total"]
     with st.container(border=True):
         if total == 0:
-            st.caption("Brak fiszek — dodaj pierwszą na stronie 🃏 Fiszki.")
+            empty_state("Brak fiszek — dodaj pierwszą na stronie 🃏 Fiszki.")
             return
         for box, count in sorted(data["boxes"].items()):
             st.progress(count / total, text=f"Pudełko {box} · {count}")

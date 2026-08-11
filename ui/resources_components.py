@@ -3,7 +3,8 @@ import sqlite3
 import streamlit as st
 
 from repository import resources_repo
-from ui.components import phase_label, phase_options
+from ui.components import confirm_delete, phase_label, phase_options
+from ui.theme import METRIC_WIDTH, badge, empty_state
 
 KIND_LABELS = {
     "book": ("📕", "Książka"),
@@ -64,7 +65,6 @@ def render_resource_row(
     conn: sqlite3.Connection, resource: sqlite3.Row, phases: list[sqlite3.Row]
 ) -> None:
     resource_id = resource["id"]
-    confirm_key = f"confirm_delete_resource_{resource_id}"
     options = phase_options(phases)
 
     icon, kind_label = KIND_LABELS.get(resource["kind"], KIND_LABELS["other"])
@@ -72,13 +72,10 @@ def render_resource_row(
     title = resource["title"]
     # Tytuł jako link, gdy jest URL - jedno kliknięcie zamiast kopiowania.
     heading = f"[{title}]({resource['url']})" if resource["url"] else f"**{title}**"
+    kind_badge = badge(f"{icon} {kind_label}", STATUS_BADGE_COLORS.get(status, "gray"))
 
     with st.container(horizontal=True, vertical_alignment="center"):
-        st.markdown(
-            f":{STATUS_BADGE_COLORS.get(status, 'gray')}-badge[{icon} {kind_label}] "
-            f"{heading}",
-            width="stretch",
-        )
+        st.markdown(f"{kind_badge} {heading}", width="stretch")
         with st.popover("✏️", width="content"):
             st.text_input(
                 "Tytuł",
@@ -112,20 +109,12 @@ def render_resource_row(
                 args=(conn, resource_id, options),
             )
             st.divider()
-            if st.session_state.get(confirm_key):
-                st.caption("Na pewno usunąć ten materiał?")
-                with st.container(horizontal=True):
-                    if st.button("Tak, usuń", key=f"resource_delete_yes_{resource_id}"):
-                        resources_repo.delete(conn, resource_id)
-                        st.session_state[confirm_key] = False
-                        st.rerun()
-                    if st.button("Anuluj", key=f"resource_delete_no_{resource_id}"):
-                        st.session_state[confirm_key] = False
-                        st.rerun()
-            else:
-                if st.button("🗑️ Usuń materiał", key=f"resource_delete_{resource_id}"):
-                    st.session_state[confirm_key] = True
-                    st.rerun()
+            confirm_delete(
+                "Usuń materiał",
+                "Na pewno usunąć ten materiał?",
+                f"resource_{resource_id}",
+                lambda: resources_repo.delete(conn, resource_id),
+            )
 
     st.segmented_control(
         "Status",
@@ -195,7 +184,7 @@ def render_phase_resources_section(
         if resources:
             st.progress(done / len(resources))
         else:
-            st.caption("Brak materiałów - dodaj pierwszy poniżej.")
+            empty_state("Brak materiałów — dodaj pierwszy poniżej.")
         for resource in resources:
             render_resource_row(conn, resource, phases)
 
@@ -210,4 +199,4 @@ def render_overall_progress(conn: sqlite3.Connection) -> None:
 
     with st.container(horizontal=True):
         for status, label in STATUS_LABELS.items():
-            st.metric(label, counts.get(status, 0), border=True, width=170)
+            st.metric(label, counts.get(status, 0), border=True, width=METRIC_WIDTH)
