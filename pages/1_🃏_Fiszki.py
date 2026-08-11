@@ -15,7 +15,9 @@ st.markdown("`$ ml-roadmap --review`")
 
 conn = init_app()
 
+phases = phases_repo.list_all(conn)
+
 render_due_today_section(conn)
 st.divider()
-render_add_flashcard_form(conn, phases_repo.list_all(conn))
-render_all_flashcards_list(conn)
+render_add_flashcard_form(conn, phases)
+render_all_flashcards_list(conn, phases)

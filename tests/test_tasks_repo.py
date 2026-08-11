@@ -2,9 +2,7 @@ from repository import phases_repo, tasks_repo
 
 
 def _make_phase(conn, code="0", name="Faza 0"):
-    cursor = conn.execute(
-        "INSERT INTO phases (code, name) VALUES (?, ?)", (code, name)
-    )
+    cursor = conn.execute("INSERT INTO phases (code, name) VALUES (?, ?)", (code, name))
     conn.commit()
     return cursor.lastrowid
 
@@ -101,9 +99,7 @@ def test_deleting_phase_cascades_tasks(conn):
 
 def test_phases_list_all_ordered(conn):
     _make_phase(conn, "late", "Późna")
-    conn.execute(
-        "UPDATE phases SET order_index = 5 WHERE code = 'late'"
-    )
+    conn.execute("UPDATE phases SET order_index = 5 WHERE code = 'late'")
     _make_phase(conn, "early", "Wczesna")
     conn.commit()
 

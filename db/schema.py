@@ -87,6 +87,42 @@ CREATE INDEX IF NOT EXISTS idx_question_attempts_question_id ON question_attempt
 """
 
 
+# activity_log.ref_id celowo NIE jest kluczem obcym - to trzeci wzorzec
+# relacji obok dwóch opisanych w README. Wpis dziennika ma przeżyć usunięcie
+# obiektu, którego dotyczy: dziennik, który da się wyczyścić kasując taska,
+# nie jest dziennikiem. Dlatego `detail` trzyma zdenormalizowaną migawkę
+# tytułu - wpis pozostaje czytelny nawet gdy źródło zniknie.
+_CREATE_ACTIVITY_LOG = """
+CREATE TABLE IF NOT EXISTS activity_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    occurred_at  TEXT NOT NULL,
+    kind         TEXT NOT NULL CHECK (kind IN ('task_done', 'task_undone', 'card_review', 'question_attempt')),
+    ref_id       INTEGER,
+    detail       TEXT NOT NULL DEFAULT ''
+);
+"""
+
+_CREATE_ACTIVITY_LOG_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_activity_log_occurred_at ON activity_log(occurred_at);
+"""
+
+# Backfill: question_attempts to jedyna tabela z prawdziwym logiem zdarzeń,
+# więc jej historię da się przenieść 1:1. Tasków i fiszek odtworzyć nie można -
+# updated_at jest nadpisywane przy każdej zmianie, więc niesie tylko datę
+# ostatniej edycji, nie przebieg. Historia tych dwóch zaczyna się od migracji.
+_BACKFILL_ACTIVITY_FROM_ATTEMPTS = """
+INSERT INTO activity_log (occurred_at, kind, ref_id, detail)
+SELECT
+    question_attempts.attempted_at,
+    'question_attempt',
+    question_attempts.question_id,
+    COALESCE(questions.question_text, '')
+FROM question_attempts
+LEFT JOIN questions ON questions.id = question_attempts.question_id
+ORDER BY question_attempts.attempted_at, question_attempts.id;
+"""
+
+
 def _migration_1_initial_schema(conn: sqlite3.Connection) -> None:
     # IF NOT EXISTS pozwala bezpiecznie "zaadoptować" bazę sprzed
     # wersjonowania (tabele istnieją, user_version = 0).
@@ -101,7 +137,111 @@ def _migration_1_initial_schema(conn: sqlite3.Connection) -> None:
     conn.execute(_CREATE_QUESTION_ATTEMPTS_INDEX)
 
 
-MIGRATIONS = [_migration_1_initial_schema]
+# Ewidencja tego, co już wjechało z katalogu content/. Bez niej import przy
+# starcie wskrzeszałby fiszki skasowane wcześniej w UI - obecność wiersza
+# w flashcards nie mówi "czy to kiedykolwiek zaimportowano", tylko "czy jest
+# teraz". item_key celowo nie zawiera nazwy pliku: przeniesienie fiszki do
+# innego pliku ma nie robić z niej nowej pozycji.
+_CREATE_CONTENT_IMPORTS = """
+CREATE TABLE IF NOT EXISTS content_imports (
+    kind        TEXT NOT NULL CHECK (kind IN ('flashcard', 'question')),
+    item_key    TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    PRIMARY KEY (kind, item_key)
+);
+"""
+
+
+def _migration_2_activity_log(conn: sqlite3.Connection) -> None:
+    conn.execute(_CREATE_ACTIVITY_LOG)
+    conn.execute(_CREATE_ACTIVITY_LOG_INDEX)
+    # Backfill tylko do pustego dziennika. Tak jak IF NOT EXISTS wyżej, to
+    # zabezpieczenie ścieżki adopcji bazy sprzed wersjonowania, gdzie tabele
+    # już istnieją, a migracje przejeżdżają jeszcze raz - bez tego warunku
+    # historia podejść zdublowałaby się.
+    existing = conn.execute("SELECT COUNT(*) FROM activity_log").fetchone()[0]
+    if existing == 0:
+        conn.execute(_BACKFILL_ACTIVITY_FROM_ATTEMPTS)
+
+
+def _migration_3_content_imports(conn: sqlite3.Connection) -> None:
+    conn.execute(_CREATE_CONTENT_IMPORTS)
+
+
+def _migration_4_question_answer(conn: sqlite3.Connection) -> None:
+    # Bank pytań bez odpowiedzi był ślepym zaułkiem: przycisk "musiałem
+    # sprawdzić rozwiązanie" nie miał gdzie odesłać. SQLite pozwala na
+    # ADD COLUMN ze stałym defaultem, więc istniejące wiersze dostają ''.
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(questions)").fetchall()
+    }
+    if "answer" not in columns:
+        conn.execute("ALTER TABLE questions ADD COLUMN answer TEXT NOT NULL DEFAULT ''")
+
+
+# resources.phase_id: cross-module, opcjonalny link do Modułu 1 - nullable +
+# ON DELETE SET NULL, tak jak flashcards i questions.
+_CREATE_RESOURCES = """
+CREATE TABLE IF NOT EXISTS resources (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    phase_id     INTEGER REFERENCES phases(id) ON DELETE SET NULL,
+    title        TEXT NOT NULL,
+    url          TEXT NOT NULL DEFAULT '',
+    kind         TEXT NOT NULL DEFAULT 'other',
+    detail       TEXT NOT NULL DEFAULT '',
+    status       TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done')),
+    order_index  INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+"""
+
+_CREATE_RESOURCES_INDEX = """
+CREATE INDEX IF NOT EXISTS idx_resources_phase_id ON resources(phase_id);
+"""
+
+# Przebudowa content_imports bez CHECK na kind. SQLite nie umie zmienić
+# CHECK w miejscu, więc trzeba nowa tabela + przepisanie + podmiana.
+# Lista rodzajów rośnie z każdym modułem (doszedł 'resource'), więc jej
+# miejsce jest w repository/content_imports_repo.py, nie w schemacie.
+_REBUILD_CONTENT_IMPORTS = [
+    """
+    CREATE TABLE content_imports_nowa (
+        kind        TEXT NOT NULL,
+        item_key    TEXT NOT NULL,
+        created_at  TEXT NOT NULL,
+        PRIMARY KEY (kind, item_key)
+    );
+    """,
+    "INSERT INTO content_imports_nowa SELECT kind, item_key, created_at "
+    "FROM content_imports;",
+    "DROP TABLE content_imports;",
+    "ALTER TABLE content_imports_nowa RENAME TO content_imports;",
+]
+
+
+def _migration_5_resources(conn: sqlite3.Connection) -> None:
+    conn.execute(_CREATE_RESOURCES)
+    conn.execute(_CREATE_RESOURCES_INDEX)
+
+    # Przepisujemy tylko wtedy, gdy CHECK faktycznie tam jeszcze jest -
+    # inaczej powtórne przejechanie migracji gubiłoby ewidencję i cały
+    # starter wjechałby drugi raz.
+    definicja = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'content_imports'"
+    ).fetchone()
+    if definicja is not None and "CHECK" in (definicja["sql"] or ""):
+        for statement in _REBUILD_CONTENT_IMPORTS:
+            conn.execute(statement)
+
+
+MIGRATIONS = [
+    _migration_1_initial_schema,
+    _migration_2_activity_log,
+    _migration_3_content_imports,
+    _migration_4_question_answer,
+    _migration_5_resources,
+]
 
 
 def init_db(conn: sqlite3.Connection) -> None:

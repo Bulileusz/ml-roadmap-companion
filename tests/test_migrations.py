@@ -1,7 +1,16 @@
 from db.connection import get_connection
 from db.schema import MIGRATIONS, init_db
 
-ALL_TABLES = {"phases", "tasks", "flashcards", "questions", "question_attempts"}
+ALL_TABLES = {
+    "phases",
+    "tasks",
+    "flashcards",
+    "questions",
+    "question_attempts",
+    "activity_log",
+    "content_imports",
+    "resources",
+}
 
 
 def _table_names(conn):
@@ -29,6 +38,160 @@ def test_init_db_is_idempotent(conn):
     assert _user_version(conn) == len(MIGRATIONS)
     count = conn.execute("SELECT COUNT(*) FROM phases").fetchone()[0]
     assert count == 1
+
+
+def _migrate_to_version_1(db_path):
+    """Baza zatrzymana na wersji 1 - stan sprzed dołożenia dziennika."""
+    connection = get_connection(db_path)
+    MIGRATIONS[0](connection)
+    connection.execute("PRAGMA user_version = 1")
+    connection.commit()
+    return connection
+
+
+def test_v1_db_upgrades_and_backfills_attempts(tmp_path):
+    old = _migrate_to_version_1(tmp_path / "v1.db")
+    old.execute("INSERT INTO phases (code, name) VALUES ('0', 'Faza 0')")
+    old.execute(
+        "INSERT INTO questions (id, phase_id, question_text, question_type) "
+        "VALUES (7, 1, 'Czym jest wariancja?', 'concept')"
+    )
+    old.execute(
+        "INSERT INTO question_attempts (question_id, attempted_at, "
+        "solved_independently) VALUES "
+        "(7, '2026-03-10 08:00:00', 1), (7, '2026-03-11 09:30:00', 0)"
+    )
+    old.commit()
+    assert _user_version(old) == 1
+    assert "activity_log" not in _table_names(old)
+
+    init_db(old)
+
+    assert _user_version(old) == len(MIGRATIONS)
+    rows = old.execute("SELECT * FROM activity_log ORDER BY occurred_at").fetchall()
+    assert [row["occurred_at"] for row in rows] == [
+        "2026-03-10 08:00:00",
+        "2026-03-11 09:30:00",
+    ]
+    assert {row["kind"] for row in rows} == {"question_attempt"}
+    assert {row["ref_id"] for row in rows} == {7}
+    # detail to migawka treści pytania, dociągana JOIN-em w backfillu.
+    assert {row["detail"] for row in rows} == {"Czym jest wariancja?"}
+    old.close()
+
+
+def test_backfill_does_not_duplicate_when_migrations_replay(tmp_path):
+    old = _migrate_to_version_1(tmp_path / "replay.db")
+    old.execute("INSERT INTO phases (code, name) VALUES ('0', 'Faza 0')")
+    old.execute(
+        "INSERT INTO questions (id, phase_id, question_text, question_type) "
+        "VALUES (1, 1, 'Pytanie', 'concept')"
+    )
+    old.execute(
+        "INSERT INTO question_attempts (question_id, attempted_at, "
+        "solved_independently) VALUES (1, '2026-03-10 08:00:00', 1)"
+    )
+    old.commit()
+
+    init_db(old)
+    # Powtórne przejechanie migracji (ścieżka adopcji starej bazy) nie może
+    # zdublować przeniesionej historii.
+    MIGRATIONS[1](old)
+
+    count = old.execute("SELECT COUNT(*) FROM activity_log").fetchone()[0]
+    assert count == 1
+    old.close()
+
+
+def test_v3_db_gains_answer_column_with_empty_default(tmp_path):
+    old = get_connection(tmp_path / "v3.db")
+    for migration in MIGRATIONS[:3]:
+        migration(old)
+    old.execute("PRAGMA user_version = 3")
+    old.execute("INSERT INTO phases (code, name) VALUES ('0', 'Faza 0')")
+    old.execute(
+        "INSERT INTO questions (id, phase_id, question_text, question_type) "
+        "VALUES (5, 1, 'Stare pytanie', 'concept')"
+    )
+    old.commit()
+    columns = {row["name"] for row in old.execute("PRAGMA table_info(questions)")}
+    assert "answer" not in columns
+
+    init_db(old)
+
+    assert _user_version(old) == len(MIGRATIONS)
+    row = old.execute("SELECT * FROM questions WHERE id = 5").fetchone()
+    # Istniejące pytanie dostaje pustą odpowiedź, a nie NULL - import z
+    # content/ rozpoznaje po tym, że można ją uzupełnić.
+    assert row["answer"] == ""
+    assert row["question_text"] == "Stare pytanie"
+    old.close()
+
+
+def test_answer_migration_is_idempotent(tmp_path):
+    conn = get_connection(tmp_path / "idem.db")
+    init_db(conn)
+    conn.execute("INSERT INTO phases (code, name) VALUES ('0', 'Faza 0')")
+    conn.execute(
+        "INSERT INTO questions (phase_id, question_text, question_type, answer) "
+        "VALUES (1, 'Pytanie', 'concept', 'Odpowiedź')"
+    )
+    conn.commit()
+
+    # Powtórne przejechanie migracji (ścieżka adopcji) nie może wywalić się na
+    # istniejącej kolumnie ani skasować zapisanej odpowiedzi.
+    MIGRATIONS[3](conn)
+
+    assert conn.execute("SELECT answer FROM questions").fetchone()["answer"] == (
+        "Odpowiedź"
+    )
+    conn.close()
+
+
+def test_v4_db_gains_resources_and_keeps_the_import_ledger(tmp_path):
+    old = get_connection(tmp_path / "v4.db")
+    for migration in MIGRATIONS[:4]:
+        migration(old)
+    old.execute("PRAGMA user_version = 4")
+    old.execute(
+        "INSERT INTO content_imports (kind, item_key, created_at) "
+        "VALUES ('flashcard', '0|coś', '2026-01-01 10:00:00')"
+    )
+    old.commit()
+    assert "resources" not in _table_names(old)
+
+    init_db(old)
+
+    assert _user_version(old) == len(MIGRATIONS)
+    assert "resources" in _table_names(old)
+    # Przebudowa content_imports musi zachować wiersze - inaczej cały starter
+    # wjechałby drugi raz przy najbliższym starcie.
+    rows = old.execute("SELECT * FROM content_imports").fetchall()
+    assert [(r["kind"], r["item_key"]) for r in rows] == [("flashcard", "0|coś")]
+    # CHECK na kind zniknął, więc nowy rodzaj przechodzi.
+    old.execute(
+        "INSERT INTO content_imports (kind, item_key, created_at) "
+        "VALUES ('resource', '0|islr', '2026-01-01 10:00:00')"
+    )
+    old.commit()
+    old.close()
+
+
+def test_content_imports_rebuild_runs_only_once(tmp_path):
+    conn = get_connection(tmp_path / "rebuild.db")
+    init_db(conn)
+    conn.execute(
+        "INSERT INTO content_imports (kind, item_key, created_at) "
+        "VALUES ('resource', '0|islr', '2026-01-01 10:00:00')"
+    )
+    conn.commit()
+
+    # Powtórne przejechanie migracji nie może wyczyścić ewidencji.
+    MIGRATIONS[4](conn)
+
+    count = conn.execute("SELECT COUNT(*) FROM content_imports").fetchone()[0]
+    assert count == 1
+    conn.close()
 
 
 def test_legacy_db_without_user_version_is_adopted(tmp_path):

@@ -32,9 +32,7 @@ def count_by_box(conn: sqlite3.Connection) -> dict[int, int]:
 
 
 def get(conn: sqlite3.Connection, card_id: int) -> sqlite3.Row | None:
-    return conn.execute(
-        "SELECT * FROM flashcards WHERE id = ?", (card_id,)
-    ).fetchone()
+    return conn.execute("SELECT * FROM flashcards WHERE id = ?", (card_id,)).fetchone()
 
 
 def create(
@@ -61,6 +59,14 @@ def update_content(
     conn.execute(
         "UPDATE flashcards SET front = ?, back = ?, updated_at = ? WHERE id = ?",
         (front, back, clock.now_iso(), card_id),
+    )
+    conn.commit()
+
+
+def update_phase(conn: sqlite3.Connection, card_id: int, phase_id: int | None) -> None:
+    conn.execute(
+        "UPDATE flashcards SET phase_id = ?, updated_at = ? WHERE id = ?",
+        (phase_id, clock.now_iso(), card_id),
     )
     conn.commit()
 

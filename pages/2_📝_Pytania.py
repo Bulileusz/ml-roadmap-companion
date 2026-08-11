@@ -11,5 +11,6 @@ st.markdown("`$ ml-roadmap --quiz`")
 
 conn = init_app()
 
-for phase in phases_repo.list_all(conn):
-    render_phase_questions_section(conn, phase)
+phases = phases_repo.list_all(conn)
+for phase in phases:
+    render_phase_questions_section(conn, phase, phases)

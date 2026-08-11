@@ -57,6 +57,41 @@ def test_delete(conn):
     assert flashcards_repo.list_all(conn) == []
 
 
+def test_update_phase(conn):
+    cursor = conn.execute("INSERT INTO phases (code, name) VALUES ('0', 'Faza 0')")
+    conn.commit()
+    phase_id = cursor.lastrowid
+    card_id = flashcards_repo.create(conn, "a", "b", None, "2026-01-10")
+
+    flashcards_repo.update_phase(conn, card_id, phase_id)
+
+    assert flashcards_repo.get(conn, card_id)["phase_id"] == phase_id
+
+    flashcards_repo.update_phase(conn, card_id, None)
+
+    assert flashcards_repo.get(conn, card_id)["phase_id"] is None
+
+
+def test_update_phase_keeps_schedule_and_still_set_null_on_phase_delete(conn):
+    cursor = conn.execute("INSERT INTO phases (code, name) VALUES ('0', 'Faza 0')")
+    conn.commit()
+    phase_id = cursor.lastrowid
+    card_id = flashcards_repo.create(conn, "a", "b", None, "2026-01-10")
+    flashcards_repo.update_schedule(conn, card_id, 3, "2026-01-14")
+
+    flashcards_repo.update_phase(conn, card_id, phase_id)
+
+    card = flashcards_repo.get(conn, card_id)
+    # Przepięcie fazy nie rusza harmonogramu powtórek.
+    assert card["box"] == 3
+    assert card["next_review_at"] == "2026-01-14"
+
+    # FK dopięty przez update_phase zachowuje się tak samo jak ten z insertu.
+    conn.execute("DELETE FROM phases WHERE id = ?", (phase_id,))
+    conn.commit()
+    assert flashcards_repo.get(conn, card_id)["phase_id"] is None
+
+
 def test_deleting_phase_sets_phase_id_null(conn):
     cursor = conn.execute("INSERT INTO phases (code, name) VALUES ('0', 'Faza 0')")
     conn.commit()

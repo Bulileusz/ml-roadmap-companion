@@ -19,6 +19,57 @@ def test_create_and_list_by_phase(conn):
     assert questions[1]["question_type"] == "code"
 
 
+def test_update_text(conn):
+    phase_id = _make_phase(conn)
+    question_id = questions_repo.create(conn, phase_id, "Stara treść", "concept")
+
+    questions_repo.update_text(conn, question_id, "Nowa treść")
+
+    question = questions_repo.list_by_phase(conn, phase_id)[0]
+    assert question["question_text"] == "Nowa treść"
+    # Typ nietknięty - settery są granularne.
+    assert question["question_type"] == "concept"
+
+
+def test_update_type(conn):
+    phase_id = _make_phase(conn)
+    question_id = questions_repo.create(conn, phase_id, "Pytanie", "concept")
+
+    questions_repo.update_type(conn, question_id, "code")
+
+    question = questions_repo.list_by_phase(conn, phase_id)[0]
+    assert question["question_type"] == "code"
+    assert question["question_text"] == "Pytanie"
+
+
+def test_update_phase_moves_question(conn):
+    source_id = _make_phase(conn)
+    cursor = conn.execute("INSERT INTO phases (code, name) VALUES ('1', 'Faza 1')")
+    conn.commit()
+    target_id = cursor.lastrowid
+    question_id = questions_repo.create(conn, source_id, "Pytanie", "concept")
+
+    questions_repo.update_phase(conn, question_id, target_id)
+
+    assert questions_repo.list_by_phase(conn, source_id) == []
+    assert [q["id"] for q in questions_repo.list_by_phase(conn, target_id)] == [
+        question_id
+    ]
+
+
+def test_update_phase_to_none_detaches_question(conn):
+    phase_id = _make_phase(conn)
+    question_id = questions_repo.create(conn, phase_id, "Pytanie", "concept")
+
+    questions_repo.update_phase(conn, question_id, None)
+
+    assert questions_repo.list_by_phase(conn, phase_id) == []
+    row = conn.execute(
+        "SELECT phase_id FROM questions WHERE id = ?", (question_id,)
+    ).fetchone()
+    assert row["phase_id"] is None
+
+
 def test_delete_question(conn):
     phase_id = _make_phase(conn)
     question_id = questions_repo.create(conn, phase_id, "Pytanie", "concept")

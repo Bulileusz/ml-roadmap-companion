@@ -1,7 +1,7 @@
 import sqlite3
 from datetime import date, timedelta
 
-from repository import flashcards_repo
+from repository import activity_repo, flashcards_repo
 from services import clock
 
 # Leitner: 5 pudełek, im wyższe pudełko tym rzadsza powtórka.
@@ -48,4 +48,8 @@ def record_review(
     new_box = next_box(card["box"], correct)
     new_date = next_review_date(new_box, today or clock.today())
     flashcards_repo.update_schedule(conn, card_id, new_box, new_date.isoformat())
+    # Do dziennika trafia sam fakt powtórki - "umiałem"/"nie umiałem" jest już
+    # zakodowane w pudełku fiszki, a dziennik ma odpowiadać na pytanie
+    # "czy tego dnia się uczyłem", nie duplikować stanu Leitnera.
+    activity_repo.log(conn, activity_repo.KIND_CARD_REVIEW, card_id, card["front"])
     return True

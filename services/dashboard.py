@@ -2,12 +2,13 @@ import sqlite3
 from datetime import date
 
 from repository import flashcards_repo, question_attempts_repo, tasks_repo
-from services import clock, progress
+from services import activity, clock, progress
 from services.spaced_repetition import MAX_BOX, MIN_BOX
 
 
 def get_dashboard_data(conn: sqlite3.Connection, today: date | None = None) -> dict:
-    cutoff = (today or clock.today()).isoformat()
+    reference = today or clock.today()
+    cutoff = reference.isoformat()
 
     independent, attempts_total = question_attempts_repo.count_overall(conn)
 
@@ -25,4 +26,5 @@ def get_dashboard_data(conn: sqlite3.Connection, today: date | None = None) -> d
         "boxes": boxes,
         "cards_total": sum(boxes.values()),
         "next_task": tasks_repo.first_incomplete(conn),
+        "streak": activity.get_streak(conn, reference),
     }

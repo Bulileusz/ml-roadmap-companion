@@ -1,5 +1,10 @@
 import streamlit as st
 
+# Szerokość kafelka metryki w pikselach. Stała, a nie "stretch", bo to ona
+# decyduje, ile kafelków zmieści się w rzędzie przed zawinięciem: przy 390 px
+# ekranu wychodzą dwa, przy szerokim - wszystkie cztery.
+METRIC_WIDTH = 170
+
 
 def _fiszki_form(n: int) -> str:
     # Polska odmiana: 1 fiszka, 2-4 fiszki, 5+ fiszek (z wyjątkiem 12-14).
@@ -10,33 +15,56 @@ def _fiszki_form(n: int) -> str:
     return "fiszek"
 
 
+def _dni_form(n: int) -> str:
+    # Polska odmiana: 1 dzień, 2-4 dni, 5+ dni - "dni" poza mianownikiem
+    # liczby pojedynczej jest niezmienne, więc rozróżniamy tylko 1 vs reszta.
+    return "dzień" if n == 1 else "dni"
+
+
 def render_metrics_row(data: dict) -> None:
     roadmap = data["roadmap"]
     independence = data["independence"]
+    streak = data["streak"]
 
-    col_roadmap, col_due, col_ind = st.columns(3)
-    col_roadmap.metric(
-        "Postęp roadmapy",
-        f"{int(roadmap['pct'])}%",
-        delta=f"{roadmap['done']}/{roadmap['total']} zadań",
-        delta_color="off",
-        border=True,
-    )
-    col_due.metric(
-        "Fiszki na dziś",
-        data["due_count"],
-        delta=f"{data['cards_total']} {_fiszki_form(data['cards_total'])} łącznie",
-        delta_color="off",
-        border=True,
-    )
     ind_value = "—" if independence["total"] == 0 else f"{int(independence['pct'])}%"
-    col_ind.metric(
-        "Samodzielność",
-        ind_value,
-        delta=f"{independence['independent']}/{independence['total']} podejść",
-        delta_color="off",
-        border=True,
-    )
+
+    # Kontener poziomy zamiast st.columns(4): kolumny na telefonie układają się
+    # jedna pod drugą i sam rząd metryk zajmuje ~600 px, zanim widać cokolwiek
+    # innego. Kontener poziomy zawija, więc na wąskim ekranie wychodzi 2x2,
+    # a na szerokim dalej jeden rząd.
+    with st.container(horizontal=True):
+        st.metric(
+            "Postęp roadmapy",
+            f"{int(roadmap['pct'])}%",
+            delta=f"{roadmap['done']}/{roadmap['total']} zadań",
+            delta_color="off",
+            border=True,
+            width=METRIC_WIDTH,
+        )
+        st.metric(
+            "Fiszki na dziś",
+            data["due_count"],
+            delta=f"{data['cards_total']} {_fiszki_form(data['cards_total'])} łącznie",
+            delta_color="off",
+            border=True,
+            width=METRIC_WIDTH,
+        )
+        st.metric(
+            "Samodzielność",
+            ind_value,
+            delta=f"{independence['independent']}/{independence['total']} podejść",
+            delta_color="off",
+            border=True,
+            width=METRIC_WIDTH,
+        )
+        st.metric(
+            "Seria dni",
+            f"{streak['current']} {_dni_form(streak['current'])}",
+            delta=f"rekord: {streak['longest']}",
+            delta_color="off",
+            border=True,
+            width=METRIC_WIDTH,
+        )
 
 
 def render_today_section(data: dict) -> None:
