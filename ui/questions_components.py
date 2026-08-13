@@ -4,7 +4,8 @@ import streamlit as st
 
 from repository import question_attempts_repo, questions_repo
 from services import activity, question_stats
-from ui.components import phase_label, phase_options
+from ui.components import confirm_delete, phase_label, phase_options
+from ui.theme import answer_surface, badge, empty_state
 
 QUESTION_TYPE_LABELS = {"concept": "Koncepcyjne", "code": "Kodowe"}
 QUESTION_TYPE_BADGE_COLORS = {"concept": "blue", "code": "violet"}
@@ -50,132 +51,127 @@ def render_question_row(
     conn: sqlite3.Connection, question: sqlite3.Row, phases: list[sqlite3.Row]
 ) -> None:
     question_id = question["id"]
-    confirm_key = f"confirm_delete_question_{question_id}"
     options = phase_options(phases)
-
-    # Domyślnie widać samą treść i akcje. Edycja (typ, faza, usuwanie) siedzi
-    # w popoverze, bo rozłożona na stałe zajmowała na telefonie ~250 px na
-    # każde pytanie - faza z 12 pytaniami to było 5000 px przewijania.
     question_type = question["question_type"]
-    st.markdown(
-        f":{QUESTION_TYPE_BADGE_COLORS.get(question_type, 'gray')}-badge"
-        f"[{QUESTION_TYPE_LABELS.get(question_type, question_type)}] "
-        f"**{question['question_text']}**"
-    )
-
-    with st.popover("✏️ Edytuj", width="content"):
-        st.text_area(
-            "Treść pytania",
-            value=question["question_text"],
-            key=f"question_text_{question_id}",
-            on_change=_on_text_change,
-            args=(conn, question_id, question["question_text"]),
-            height=120,
-        )
-        type_keys = list(QUESTION_TYPE_LABELS.keys())
-        st.selectbox(
-            "Typ",
-            options=type_keys,
-            index=type_keys.index(question_type),
-            format_func=lambda key: QUESTION_TYPE_LABELS[key],
-            key=f"question_type_edit_{question_id}",
-            on_change=_on_type_change,
-            args=(conn, question_id),
-        )
-        option_labels = list(options.keys())
-        st.selectbox(
-            "Faza",
-            options=option_labels,
-            index=option_labels.index(phase_label(options, question["phase_id"])),
-            key=f"question_phase_{question_id}",
-            on_change=_on_phase_change,
-            args=(conn, question_id, options),
-        )
-        st.text_area(
-            "Odpowiedź / wyjaśnienie",
-            value=question["answer"],
-            key=f"question_answer_{question_id}",
-            on_change=_on_answer_change,
-            args=(conn, question_id),
-            height=160,
-            placeholder="czego dowodzi to pytanie, na co zwrócić uwagę...",
-        )
-        st.divider()
-        if st.session_state.get(confirm_key):
-            st.caption("Na pewno usunąć to pytanie razem z historią podejść?")
-            with st.container(horizontal=True):
-                if st.button("Tak, usuń", key=f"question_delete_yes_{question_id}"):
-                    questions_repo.delete(conn, question_id)
-                    st.session_state[confirm_key] = False
-                    st.rerun()
-                if st.button("Anuluj", key=f"question_delete_no_{question_id}"):
-                    st.session_state[confirm_key] = False
-                    st.rerun()
-        else:
-            if st.button("🗑️ Usuń pytanie", key=f"question_delete_{question_id}"):
-                st.session_state[confirm_key] = True
-                st.rerun()
 
     attempts = question_attempts_repo.list_by_question(conn, question_id)
     summary = question_stats.summarize_attempts(attempts)
-
     reveal_key = f"reveal_answer_{question_id}"
     answer = question["answer"].strip()
 
-    with st.container(horizontal=True):
-        if st.button(
-            "✅ Samodzielnie",
-            key=f"solo_{question_id}",
-            help="Rozwiązałem samodzielnie",
-        ):
-            activity.record_question_attempt(conn, question, True)
-            st.session_state[reveal_key] = False
-            st.rerun()
-        if st.button(
-            "📖 Sprawdziłem",
-            key=f"checked_{question_id}",
-            help="Musiałem sprawdzić rozwiązanie",
-        ):
-            activity.record_question_attempt(conn, question, False)
-            # Kliknięcie "sprawdziłem" bez pokazania odpowiedzi nie miałoby
-            # sensu - odsłaniamy ją od razu, bo po to się tu kliknęło.
-            st.session_state[reveal_key] = True
-            st.rerun()
-        if answer and not st.session_state.get(reveal_key):
-            if st.button("💡 Pokaż odpowiedź", key=f"reveal_{question_id}"):
+    # Ramka zamiast st.divider() po każdym pytaniu. Kreska po każdym z
+    # dwunastu pytań krajała fazę na paski, nic przy tym nie grupując -
+    # kontener trzyma treść, akcje, odpowiedź i historię jednego pytania
+    # widocznie razem.
+    with st.container(border=True):
+        # Domyślnie widać samą treść i akcje. Edycja (typ, faza, usuwanie)
+        # siedzi w popoverze, bo rozłożona na stałe zajmowała na telefonie
+        # ~250 px na każde pytanie - faza z 12 pytaniami to było 5000 px
+        # przewijania.
+        type_label = QUESTION_TYPE_LABELS.get(question_type, question_type)
+        type_color = QUESTION_TYPE_BADGE_COLORS.get(question_type, "gray")
+        st.markdown(
+            f"{badge(type_label, type_color)} **{question['question_text']}**"
+        )
+
+        with st.popover("✏️ Edytuj", width="content"):
+            st.text_area(
+                "Treść pytania",
+                value=question["question_text"],
+                key=f"question_text_{question_id}",
+                on_change=_on_text_change,
+                args=(conn, question_id, question["question_text"]),
+                height=120,
+            )
+            type_keys = list(QUESTION_TYPE_LABELS.keys())
+            st.selectbox(
+                "Typ",
+                options=type_keys,
+                index=type_keys.index(question_type),
+                format_func=lambda key: QUESTION_TYPE_LABELS[key],
+                key=f"question_type_edit_{question_id}",
+                on_change=_on_type_change,
+                args=(conn, question_id),
+            )
+            option_labels = list(options.keys())
+            st.selectbox(
+                "Faza",
+                options=option_labels,
+                index=option_labels.index(phase_label(options, question["phase_id"])),
+                key=f"question_phase_{question_id}",
+                on_change=_on_phase_change,
+                args=(conn, question_id, options),
+            )
+            st.text_area(
+                "Odpowiedź / wyjaśnienie",
+                value=question["answer"],
+                key=f"question_answer_{question_id}",
+                on_change=_on_answer_change,
+                args=(conn, question_id),
+                height=160,
+                placeholder="czego dowodzi to pytanie, na co zwrócić uwagę...",
+            )
+            st.divider()
+            confirm_delete(
+                "Usuń pytanie",
+                "Na pewno usunąć to pytanie razem z historią podejść?",
+                f"question_{question_id}",
+                lambda: questions_repo.delete(conn, question_id),
+            )
+
+        with st.container(horizontal=True):
+            if st.button(
+                "✅ Samodzielnie",
+                key=f"solo_{question_id}",
+                help="Rozwiązałem samodzielnie",
+            ):
+                activity.record_question_attempt(conn, question, True)
+                st.session_state[reveal_key] = False
+                st.rerun()
+            if st.button(
+                "📖 Sprawdziłem",
+                key=f"checked_{question_id}",
+                help="Musiałem sprawdzić rozwiązanie",
+            ):
+                activity.record_question_attempt(conn, question, False)
+                # Kliknięcie "sprawdziłem" bez pokazania odpowiedzi nie
+                # miałoby sensu - odsłaniamy ją od razu, bo po to się tu
+                # kliknęło.
                 st.session_state[reveal_key] = True
                 st.rerun()
+            if answer and not st.session_state.get(reveal_key):
+                if st.button("💡 Pokaż odpowiedź", key=f"reveal_{question_id}"):
+                    st.session_state[reveal_key] = True
+                    st.rerun()
 
-    if not answer:
-        st.caption(
-            "Brak odpowiedzi — dopisz ją w `content/questions/`, "
-            "albo tutaj przez ✏️ Edytuj."
-        )
-    elif st.session_state.get(reveal_key):
-        st.info(answer)
-        if st.button("Ukryj odpowiedź", key=f"hide_{question_id}"):
-            st.session_state[reveal_key] = False
-            st.rerun()
+        if not answer:
+            st.caption(
+                "Brak odpowiedzi — dopisz ją w `content/questions/`, "
+                "albo tutaj przez ✏️ Edytuj."
+            )
+        elif st.session_state.get(reveal_key):
+            answer_surface(answer, str(question_id))
+            if st.button("Ukryj odpowiedź", key=f"hide_{question_id}"):
+                st.session_state[reveal_key] = False
+                st.rerun()
 
-    if summary["total"] == 0:
-        st.caption("Brak podejść jeszcze.")
-    else:
-        st.progress(
-            summary["pct"] / 100,
-            text=(
-                f"{summary['independent']}/{summary['total']} samodzielnie "
-                f"({int(summary['pct'])}%)"
-            ),
-        )
+        if summary["total"] == 0:
+            empty_state("Brak podejść jeszcze.")
+        else:
+            st.progress(
+                summary["pct"] / 100,
+                text=(
+                    f"{summary['independent']}/{summary['total']} samodzielnie "
+                    f"({int(summary['pct'])}%)"
+                ),
+            )
 
-    if attempts:
-        with st.expander(f"Historia podejść ({len(attempts)})"):
-            for attempt in attempts:
-                icon = "✅" if attempt["solved_independently"] else "📖"
-                # Obcinamy sekundy: "YYYY-MM-DD HH:MM".
-                st.caption(f"{icon} `{attempt['attempted_at'][:16]}`")
-
-    st.divider()
+        if attempts:
+            with st.expander(f"Historia podejść ({len(attempts)})"):
+                for attempt in attempts:
+                    icon = "✅" if attempt["solved_independently"] else "📖"
+                    # Obcinamy sekundy: "YYYY-MM-DD HH:MM".
+                    st.caption(f"{icon} `{attempt['attempted_at'][:16]}`")
 
 
 def _on_add_question(conn: sqlite3.Connection, phase_id: int) -> None:
@@ -221,7 +217,7 @@ def render_phase_questions_section(
 
     with st.expander(f"{phase['name']} ({len(questions)})"):
         if not questions:
-            st.caption("Brak pytań - dodaj pierwsze poniżej.")
+            empty_state("Brak pytań — dodaj pierwsze poniżej.")
         for question in questions:
             render_question_row(conn, question, phases)
 

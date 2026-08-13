@@ -1,4 +1,5 @@
 import sqlite3
+from collections.abc import Callable
 
 import streamlit as st
 
@@ -6,6 +7,38 @@ from repository import tasks_repo
 from services import activity
 
 NO_PHASE_LABEL = "— brak —"
+
+
+def confirm_delete(
+    button_label: str, prompt: str, key: str, delete: Callable[[], None]
+) -> None:
+    """Dwustopniowe usuwanie: przycisk, a po nim potwierdzenie.
+
+    Wzorzec powtarzał się w czterech modułach, różniąc się wyłącznie
+    tekstami. Jedno miejsce oznacza, że usunięcie zadania, fiszki, pytania
+    i materiału wygląda i zachowuje się identycznie.
+
+    `key` musi być unikalny w obrębie całej apki, nie tylko modułu - id
+    zadania i id fiszki potrafią być tą samą liczbą, więc wywołania podają
+    prefiks (np. "task_7", "card_7").
+    """
+    confirm_key = f"confirm_delete_{key}"
+
+    if not st.session_state.get(confirm_key):
+        if st.button(f"🗑️ {button_label}", key=f"delete_{key}"):
+            st.session_state[confirm_key] = True
+            st.rerun()
+        return
+
+    st.caption(prompt)
+    with st.container(horizontal=True):
+        if st.button("Tak, usuń", key=f"delete_yes_{key}"):
+            delete()
+            st.session_state[confirm_key] = False
+            st.rerun()
+        if st.button("Anuluj", key=f"delete_no_{key}"):
+            st.session_state[confirm_key] = False
+            st.rerun()
 
 
 def phase_options(phases: list[sqlite3.Row]) -> dict[str, int | None]:
@@ -54,7 +87,6 @@ def _on_notes_change(conn: sqlite3.Connection, task_id: int) -> None:
 
 def render_task_row(conn: sqlite3.Connection, task: sqlite3.Row) -> None:
     task_id = task["id"]
-    confirm_key = f"confirm_delete_{task_id}"
 
     # Checkbox i tytuł zostają widoczne, bo to codzienna czynność. Notatki
     # i usuwanie idą do popovera - zawsze rozwinięte pole notatek dawało
@@ -90,20 +122,12 @@ def render_task_row(conn: sqlite3.Connection, task: sqlite3.Row) -> None:
                 placeholder="co zrobiłem, wnioski...",
             )
             st.divider()
-            if st.session_state.get(confirm_key):
-                st.caption("Na pewno usunąć to zadanie?")
-                with st.container(horizontal=True):
-                    if st.button("Tak, usuń", key=f"delete_yes_{task_id}"):
-                        tasks_repo.delete(conn, task_id)
-                        st.session_state[confirm_key] = False
-                        st.rerun()
-                    if st.button("Anuluj", key=f"delete_no_{task_id}"):
-                        st.session_state[confirm_key] = False
-                        st.rerun()
-            else:
-                if st.button("🗑️ Usuń zadanie", key=f"delete_{task_id}"):
-                    st.session_state[confirm_key] = True
-                    st.rerun()
+            confirm_delete(
+                "Usuń zadanie",
+                "Na pewno usunąć to zadanie?",
+                f"task_{task_id}",
+                lambda: tasks_repo.delete(conn, task_id),
+            )
 
 
 def _on_add_task(conn: sqlite3.Connection, phase_id: int) -> None:

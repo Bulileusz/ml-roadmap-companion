@@ -8,11 +8,12 @@ from ui.resources_components import (
 )
 from ui.theme import page_setup
 
-page_setup("Zasoby - ML Roadmap Companion", "📚")
-st.title("📚 Zasoby")
-st.markdown("`$ ml-roadmap --sources`")
-st.caption(
-    "Z czego uczyć się w danej fazie. Roadmapa mówi CO zrobić, ta strona — Z CZEGO."
+page_setup(
+    "Zasoby",
+    "📚",
+    "--sources",
+    caption="Z czego uczyć się w danej fazie. "
+    "Roadmapa mówi CO zrobić, ta strona — Z CZEGO.",
 )
 
 conn = init_app()

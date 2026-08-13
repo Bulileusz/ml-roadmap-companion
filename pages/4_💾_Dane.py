@@ -8,9 +8,7 @@ from ui.backup_components import (
 )
 from ui.theme import page_setup
 
-page_setup("Dane - ML Roadmap Companion", "💾")
-st.title("💾 Dane")
-st.markdown("`$ ml-roadmap --dump`")
+page_setup("Dane", "💾", "--dump")
 
 conn = init_app()
 

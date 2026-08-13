@@ -8,9 +8,7 @@ from ui.journal_components import (
 )
 from ui.theme import page_setup
 
-page_setup("Dziennik - ML Roadmap Companion", "📔")
-st.title("📔 Dziennik nauki")
-st.markdown("`$ ml-roadmap --log`")
+page_setup("Dziennik nauki", "📔", "--log")
 
 conn = init_app()
 

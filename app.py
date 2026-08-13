@@ -8,11 +8,9 @@ from ui.dashboard_components import (
     render_metrics_row,
     render_today_section,
 )
-from ui.theme import page_setup
+from ui.theme import APP_NAME, page_setup
 
-page_setup("ML Roadmap Companion", "🗺️")
-st.title("🗺️ ML Roadmap Companion")
-st.markdown("`$ ml-roadmap --status`")
+page_setup(APP_NAME, "🗺️", "--status")
 
 conn = init_app()
 data = dashboard.get_dashboard_data(conn)

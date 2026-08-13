@@ -100,7 +100,7 @@ pages/             kolejne strony multipage (Fiszki, Pytania, Dziennik, Dane, Za
 db/               połączenie SQLite, schema, dane startowe (seed), bootstrap
 repository/       CRUD na tabelach (phases, tasks, flashcards, questions, question_attempts, activity_log, resources)
 services/         logika biznesowa (postęp, spaced repetition, statystyki pytań, serie dni, backup)
-ui/               funkcje renderujące widgety Streamlit
+ui/               funkcje renderujące widgety Streamlit (ui/theme.py = warstwa designu)
 content/          fiszki, pytania i materiały w Markdownie, wczytywane przy starcie
 docs/             notatki projektowe (m.in. szkic modułu nauki)
 tests/            testy pytest (logika, repozytoria, migracje, seed)
@@ -126,6 +126,27 @@ kluczem obcym. Dziennik, który da się wyczyścić kasując taska, nie jest
 dziennikiem — wpis ma przeżyć usunięcie obiektu, którego dotyczy. Dlatego
 kolumna `detail` trzyma zdenormalizowaną migawkę tytułu i wpis pozostaje
 czytelny nawet po zniknięciu źródła.
+
+**Warstwa designu:** wygląd ma jedno źródło prawdy i podział na dwa poziomy.
+Wszystko, co da się wyrazić tokenem motywu, siedzi w `.streamlit/config.toml`
+(kolory, skala nagłówków, rozmiar bazowy, paleta badge'ów) — te wartości czyta
+front Streamlita, więc nie rozjadą się przy aktualizacji. `ui/theme.py` trzyma
+resztę: prymitywy (`page_setup`, `badge`, `empty_state`, `all_done`,
+`answer_surface`) i **jedyny w apce blok CSS**, wyłącznie na to, czego tokeny
+nie obsługują — wersaliki nagłówków, gęstość, cyfry tabelaryczne w metrykach.
+
+Motyw to ciemny terminal: nagłówki monospace wersalikami, zielony akcent
+zarezerwowany dla akcji (przyciski `type="primary"`), paski postępu w
+przygaszonej zieleni. Nagłówki pisane w markdownie są traktowane jako **treść**,
+nie chrome — zostają w zapisie użytkownika i w czcionce bazowej, bo przód fiszki
+to zdanie do czytania, nie listing.
+
+Selektory `data-testid` nie są publicznym API Streamlita. Te użyte w
+`ui/theme.py` zostały sprawdzone na wyrenderowanym DOM 1.59.1, a nie wzięte
+z pamięci, i są opisane komentarzem. Gdyby aktualizacja je przestawiła, apka
+nie przestanie działać — straci szlif, a naprawa ogranicza się do jednego bloku.
+CSS idzie przez `st.markdown(unsafe_allow_html=True)`, bo `st.html` sanityzuje
+treść DOMPurify i wycinał ten arkusz w całości.
 
 **Decyzja architektoniczna:** apka używa natywnego Streamlit multipage —
 `app.py` to strona startowa ("Roadmap"), kolejne moduły dochodzą jako
