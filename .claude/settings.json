@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pip install -q -r requirements-dev.txt 2>&1 | tail -3 || true",
+            "command": "uv venv --allow-existing >/dev/null 2>&1 && uv pip install -q -r backend/requirements-dev.txt 2>&1 | tail -3 || true",
             "timeout": 180
           }
         ]
@@ -15,19 +15,33 @@
   "permissions": {
     "defaultMode": "acceptEdits",
     "allow": [
-      "Read", "Glob", "Grep",
+      "Read",
+      "Glob",
+      "Grep",
       "Bash(pytest:*)",
+      "Bash(.venv/bin/python -m pytest:*)",
       "Bash(ruff:*)",
+      "Bash(.venv/bin/ruff:*)",
+      "Bash(uv venv:*)",
+      "Bash(uv pip list:*)",
+      "Bash(uv pip freeze:*)",
+      "Bash(make:*)",
       "Bash(npm test:*)",
       "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx prettier:*)",
+      "Bash(npx vite:*)",
       "Bash(git status)",
       "Bash(git diff:*)",
       "Bash(git log:*)"
     ],
     "ask": [
       "Bash(git push:*)",
-      "Bash(pip install:*)",
-      "Bash(npm install:*)"
+      "Bash(uv pip install:*)",
+      "Bash(npm install:*)",
+      "Bash(npm ci:*)"
     ],
     "deny": [
       "Bash(rm -rf:*)",

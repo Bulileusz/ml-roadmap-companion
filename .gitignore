@@ -44,3 +44,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 frontend/coverage/
+# Wygenerowany przez `make api-types` półprodukt. Do repo trafia dopiero
+# frontend/src/api/schema.d.ts, żeby front dał się zbudować bez Pythona.
+frontend/openapi.json
+frontend/*.tsbuildinfo
