@@ -19,3 +19,23 @@ data/*.db
 
 # OS
 .DS_Store
+
+# --- dev-scaffold: dopiski (agent/sekrety) ---
+.env.*
+*.key
+*.pem
+.claude/settings.local.json
+CLAUDE.local.md
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+node_modules/
+npm-debug.log*
+.npm/
+.next/
+.vercel/
+dist/
+build/
+target/
+out/
+*.log
