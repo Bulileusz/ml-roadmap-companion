@@ -61,3 +61,20 @@ def activity_last_days(
         (start + timedelta(days=offset), start + timedelta(days=offset) in active)
         for offset in range(days)
     ]
+
+
+def daily_counts(
+    counts_by_day: dict[str, int], today: date, days: int
+) -> list[tuple[date, int]]:
+    """Ostatnie `days` dni z liczbą zdarzeń - pod heatmapę i sparkline.
+
+    Wypełnianie zer jest tutaj, a nie w SQL, z tego samego powodu co przy
+    activity_last_days: dni bez ruchu nie istnieją w dzienniku, a kalendarz musi
+    je pokazać. Czysta funkcja na słowniku zamiast GROUP BY z generowaniem
+    kalendarza w SQLite - łatwiejsza do przetestowania na przypadkach brzegowych.
+    """
+    start = today - timedelta(days=days - 1)
+    return [
+        (day, counts_by_day.get(day.isoformat(), 0))
+        for day in (start + timedelta(days=offset) for offset in range(days))
+    ]

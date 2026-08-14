@@ -10,6 +10,12 @@ def list_by_phase(conn: sqlite3.Connection, phase_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def get(conn: sqlite3.Connection, question_id: int) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM questions WHERE id = ?", (question_id,)
+    ).fetchone()
+
+
 def list_for_session(
     conn: sqlite3.Connection, phase_id: int, limit: int
 ) -> list[sqlite3.Row]:

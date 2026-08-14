@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from datetime import date
 from pathlib import Path
 
 from services import clock
@@ -89,6 +90,20 @@ def _validate(conn: sqlite3.Connection, payload: dict) -> None:
         raise BackupError(f"W pliku brakuje tabel: {', '.join(missing)}.")
 
 
+def problem_with(conn: sqlite3.Connection, payload: dict) -> str | None:
+    """Powód, dla którego pliku nie da się wczytać - albo None, gdy da się.
+
+    Podgląd przed nadpisaniem potrzebuje tej samej walidacji co import, tylko
+    bez wyjątku: użytkownik ma zobaczyć problem *zamiast* przycisku „nadpisz",
+    a nie po jego kliknięciu.
+    """
+    try:
+        _validate(conn, payload)
+    except BackupError as exc:
+        return str(exc)
+    return None
+
+
 def import_data(conn: sqlite3.Connection, payload: dict) -> dict[str, int]:
     """Zastępuje całą zawartość bazy danymi z pliku. Zwraca liczby wierszy.
 
@@ -149,3 +164,54 @@ def backup_path_for(db_path: str | Path, now: str | None = None) -> Path:
     """Ścieżka kopii obok pliku bazy: roadmap.db.bak-RRRR-MM-DD-HHMMSS."""
     stamp = (now or clock.now_iso()).replace(" ", "-").replace(":", "")
     return Path(db_path).with_name(f"{Path(db_path).name}.bak-{stamp}")
+
+
+def database_path(conn: sqlite3.Connection) -> Path | None:
+    """Plik, na którym siedzi to połączenie. None dla bazy w pamięci.
+
+    Pytamy połączenie, a nie stałą DB_PATH z modułu. Wersja ze stałą działała
+    w produkcji, ale kopię bezpieczeństwa przed importem kładła zawsze obok
+    prawdziwej bazy - także wtedy, gdy request szedł na całkiem inną (w testach
+    obok data/roadmap.db pojawiały się śmieciowe .bak-*). Kopia ma leżeć obok
+    tej bazy, którą faktycznie nadpisujemy.
+    """
+    for _, name, file in conn.execute("PRAGMA database_list").fetchall():
+        if name == "main":
+            return Path(file) if file else None
+    return None
+
+
+# Ile dziennych migawek trzymamy. Historia nauki istnieje w jednej kopii -
+# data/roadmap.db nie jest w gicie i ginie razem z dyskiem. Ręczny eksport na
+# stronie Dane wymaga pamiętania o nim, więc jest tu jeszcze jeden, automatyczny
+# przy starcie. Dwa tygodnie wstecz wystarczy, żeby zauważyć, że coś się zepsuło.
+SNAPSHOTS_KEPT = 14
+
+
+def write_daily_snapshot(
+    conn: sqlite3.Connection,
+    directory: str | Path,
+    today: date | None = None,
+    keep: int = SNAPSHOTS_KEPT,
+) -> Path | None:
+    """Jedna migawka JSON na dzień. Zwraca ścieżkę albo None, gdy już istnieje.
+
+    JSON, nie kopia pliku bazy: migawka ma być czytelna i wczytywalna przez ten
+    sam import, którego używa strona Dane, także na innej maszynie i po zmianie
+    schematu. Rozmiar całej bazy to tu kilkaset kilobajtów, więc dzienna kopia
+    pełnej treści jest tańsza niż zastanawianie się nad przyrostową.
+    """
+    target_dir = Path(directory)
+    stamp = (today or clock.today()).isoformat()
+    target = target_dir / f"roadmap-snapshot-{stamp}.json"
+    if target.exists():
+        return None
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target.write_text(export_json(conn), encoding="utf-8")
+
+    # Nazwy plików są sortowalne po dacie, więc wystarczy sortowanie leksykalne.
+    snapshots = sorted(target_dir.glob("roadmap-snapshot-*.json"))
+    for stale in snapshots[:-keep]:
+        stale.unlink()
+    return target

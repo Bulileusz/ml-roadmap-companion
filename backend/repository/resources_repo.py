@@ -21,6 +21,12 @@ def list_by_phase(conn: sqlite3.Connection, phase_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def get(conn: sqlite3.Connection, resource_id: int) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM resources WHERE id = ?", (resource_id,)
+    ).fetchone()
+
+
 def create(
     conn: sqlite3.Connection,
     phase_id: int | None,

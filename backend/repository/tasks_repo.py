@@ -10,6 +10,10 @@ def list_by_phase(conn: sqlite3.Connection, phase_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def get(conn: sqlite3.Connection, task_id: int) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+
+
 def create(conn: sqlite3.Connection, phase_id: int, title: str) -> int:
     # Pojedynczy INSERT...SELECT zamiast SELECT MAX + INSERT: atomowe
     # wyznaczenie order_index na współdzielonym połączeniu.
