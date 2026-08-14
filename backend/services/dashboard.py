@@ -18,6 +18,10 @@ def get_dashboard_data(conn: sqlite3.Connection, today: date | None = None) -> d
     return {
         "roadmap": progress.get_overall_progress(conn),
         "due_count": flashcards_repo.count_due(conn, cutoff),
+        # Kolejka zapoznawcza osobno od powtórek: to dwa różne rodzaje pracy
+        # ("poznaj nowe" vs "sprawdź, czy pamiętasz") i sklejenie ich w jedną
+        # liczbę zaciemniłoby, co dziś czeka.
+        "intro_count": flashcards_repo.count_intro_queue(conn),
         "independence": {
             "independent": independent,
             "total": attempts_total,

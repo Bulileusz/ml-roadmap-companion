@@ -24,7 +24,12 @@ def _populate(conn):
     task_id = tasks_repo.create(conn, phase_id, "NumPy: broadcasting")
     tasks_repo.set_done(conn, task_id, True)
     flashcards_repo.create(
-        conn, "Gradient", "Wektor pochodnych", phase_id, "2026-03-15"
+        conn,
+        "Gradient",
+        "Wektor pochodnych",
+        phase_id,
+        "2026-03-15",
+        "2026-03-14 21:00:00",
     )
     question_id = questions_repo.create(conn, phase_id, "Czym jest bias?", "concept")
     question_attempts_repo.create(conn, question_id, True)

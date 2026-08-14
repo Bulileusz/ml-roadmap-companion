@@ -1,3 +1,7 @@
+import sqlite3
+
+import pytest
+
 from db.connection import get_connection
 from db.schema import MIGRATIONS, init_db
 
@@ -191,6 +195,126 @@ def test_content_imports_rebuild_runs_only_once(tmp_path):
 
     count = conn.execute("SELECT COUNT(*) FROM content_imports").fetchone()[0]
     assert count == 1
+    conn.close()
+
+
+def _migrate_to_version_5(db_path):
+    """Baza zatrzymana na wersji 5 - stan sprzed modułu nauki."""
+    connection = get_connection(db_path)
+    for migration in MIGRATIONS[:5]:
+        migration(connection)
+    connection.execute("PRAGMA user_version = 5")
+    connection.commit()
+    return connection
+
+
+def test_v5_db_drops_the_activity_kind_check_and_keeps_history(tmp_path):
+    old = _migrate_to_version_5(tmp_path / "v5.db")
+    old.execute(
+        "INSERT INTO activity_log (id, occurred_at, kind, ref_id, detail) VALUES "
+        "(3, '2026-03-10 08:00:00', 'task_done', 1, 'NumPy'), "
+        "(9, '2026-03-11 09:30:00', 'card_review', 2, 'Gradient')"
+    )
+    old.commit()
+    # Przed migracją nowy rodzaj odbija się od CHECK-a.
+    with pytest.raises(sqlite3.IntegrityError):
+        old.execute(
+            "INSERT INTO activity_log (occurred_at, kind) "
+            "VALUES ('2026-03-12 10:00:00', 'card_intro')"
+        )
+    old.rollback()
+
+    init_db(old)
+
+    assert _user_version(old) == len(MIGRATIONS)
+    # Przepisanie tabeli zachowuje wiersze *razem z id* - dziennik sortuje się
+    # po (occurred_at, id), więc przenumerowanie zmieniłoby kolejność zdarzeń
+    # zapisanych w tej samej sekundzie.
+    rows = old.execute("SELECT * FROM activity_log ORDER BY id").fetchall()
+    assert [(r["id"], r["kind"], r["detail"]) for r in rows] == [
+        (3, "task_done", "NumPy"),
+        (9, "card_review", "Gradient"),
+    ]
+    # Indeks ginie razem z DROP TABLE, więc migracja musi go odtworzyć.
+    indeksy = {
+        row["name"]
+        for row in old.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'index' "
+            "AND tbl_name = 'activity_log'"
+        )
+    }
+    assert "idx_activity_log_occurred_at" in indeksy
+    # A nowe rodzaje wchodzą już bez przeszkód.
+    old.execute(
+        "INSERT INTO activity_log (occurred_at, kind) VALUES "
+        "('2026-03-12 10:00:00', 'card_intro'), "
+        "('2026-03-12 11:00:00', 'resource_done')"
+    )
+    old.commit()
+    old.close()
+
+
+def test_activity_log_rebuild_runs_only_once(tmp_path):
+    conn = get_connection(tmp_path / "activity-replay.db")
+    init_db(conn)
+    conn.execute(
+        "INSERT INTO activity_log (occurred_at, kind, detail) "
+        "VALUES ('2026-03-10 08:00:00', 'card_intro', 'Gradient')"
+    )
+    conn.commit()
+
+    # Powtórne przejechanie migracji (ścieżka adopcji) nie ma prawa przemielić
+    # dziennika drugi raz - CHECK-a już nie ma, więc warunek musi je zablokować.
+    MIGRATIONS[5](conn)
+
+    rows = conn.execute("SELECT * FROM activity_log").fetchall()
+    assert [(r["kind"], r["detail"]) for r in rows] == [("card_intro", "Gradient")]
+    conn.close()
+
+
+def test_v5_db_gains_learning_columns_with_backfilled_learned_at(tmp_path):
+    old = _migrate_to_version_5(tmp_path / "v5-cards.db")
+    old.execute(
+        "INSERT INTO flashcards (id, front, back, box, next_review_at, created_at, "
+        "updated_at) VALUES "
+        "(1, 'Gradient', 'Wektor pochodnych', 4, '2026-03-20', "
+        "'2026-01-02 19:00:00', '2026-03-13 19:00:00')"
+    )
+    old.commit()
+    columns = {row["name"] for row in old.execute("PRAGMA table_info(flashcards)")}
+    assert "learned_at" not in columns
+    assert "own_note" not in columns
+
+    init_db(old)
+
+    card = old.execute("SELECT * FROM flashcards WHERE id = 1").fetchone()
+    # Karta siedząca w pudełku 4 jest dawno w rotacji - wysłanie jej do
+    # przebiegu zapoznawczego byłoby absurdem, więc backfill stempluje
+    # learned_at datą utworzenia.
+    assert card["learned_at"] == "2026-01-02 19:00:00"
+    assert card["own_note"] == ""
+    assert card["box"] == 4
+    old.close()
+
+
+def test_learning_migration_is_idempotent(tmp_path):
+    conn = get_connection(tmp_path / "learning-idem.db")
+    init_db(conn)
+    conn.execute(
+        "INSERT INTO flashcards (front, back, next_review_at, learned_at, own_note, "
+        "created_at, updated_at) VALUES "
+        "('a', 'b', '2026-03-20', NULL, 'moja notatka', '2026-03-01 10:00:00', "
+        "'2026-03-01 10:00:00')"
+    )
+    conn.commit()
+
+    MIGRATIONS[6](conn)
+
+    card = conn.execute("SELECT * FROM flashcards").fetchone()
+    # Powtórka migracji nie może ani nadpisać notatki, ani zbackfillować
+    # learned_at karcie, która świadomie czeka na zapoznanie.
+    assert card["own_note"] == "moja notatka"
+    assert card["learned_at"] is None
     conn.close()
 
 

@@ -235,12 +235,82 @@ def _migration_5_resources(conn: sqlite3.Connection) -> None:
             conn.execute(statement)
 
 
+# Przebudowa activity_log bez CHECK na kind - ten sam ruch, który migracja 5
+# zrobiła z content_imports, i z tego samego powodu: lista rodzajów zdarzeń
+# rośnie z każdym modułem (doszły 'card_intro' i 'resource_done'), więc jej
+# miejsce jest w repository/activity_repo.py, przy kodzie, który jej używa.
+# SQLite nie umie zmienić CHECK w miejscu, więc trzeba nowa tabela + przepisanie.
+#
+# W odróżnieniu od content_imports przepisujemy tu jawnie id: dziennik jest
+# uporządkowany po (occurred_at, id), a activity_log.ref_id bywa cytowane
+# w kodzie - przenumerowanie wierszy zmieniłoby kolejność zdarzeń zapisanych
+# w tej samej sekundzie.
+_REBUILD_ACTIVITY_LOG = [
+    """
+    CREATE TABLE activity_log_nowa (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        occurred_at  TEXT NOT NULL,
+        kind         TEXT NOT NULL,
+        ref_id       INTEGER,
+        detail       TEXT NOT NULL DEFAULT ''
+    );
+    """,
+    "INSERT INTO activity_log_nowa (id, occurred_at, kind, ref_id, detail) "
+    "SELECT id, occurred_at, kind, ref_id, detail FROM activity_log;",
+    "DROP TABLE activity_log;",
+    "ALTER TABLE activity_log_nowa RENAME TO activity_log;",
+    # DROP TABLE zabiera ze sobą indeks - odtwarzamy go pod nową tabelą.
+    _CREATE_ACTIVITY_LOG_INDEX,
+]
+
+
+def _migration_6_activity_kinds_without_check(conn: sqlite3.Connection) -> None:
+    # Przepisujemy tylko wtedy, gdy CHECK faktycznie tam jeszcze jest - dokładnie
+    # jak w migracji 5. Powtórne przejechanie migracji (ścieżka adopcji bazy
+    # sprzed wersjonowania) nie ma prawa przemielić dziennika po raz drugi.
+    definicja = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'activity_log'"
+    ).fetchone()
+    if definicja is not None and "CHECK" in (definicja["sql"] or ""):
+        for statement in _REBUILD_ACTIVITY_LOG:
+            conn.execute(statement)
+
+
+def _migration_7_flashcard_learning(conn: sqlite3.Connection) -> None:
+    """Moduł nauki: przebieg zapoznawczy (learned_at) i notatka własnymi słowami.
+
+    Diagnoza z docs/modul-nauki.md: pierwsze spotkanie z fiszką, której nigdy
+    nie widziałeś, kończyło się kliknięciem "nie umiałem" - czyli zapisaniem
+    porażki za to, że coś widzisz po raz pierwszy.
+    """
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(flashcards)").fetchall()
+    }
+
+    if "learned_at" not in columns:
+        conn.execute("ALTER TABLE flashcards ADD COLUMN learned_at TEXT")
+        # Backfill: fiszki, które są już w bazie, są też już w rotacji Leitnera.
+        # Przebieg zapoznawczy dotyczy tego, co dojdzie od teraz - bez tej linii
+        # pierwszy start po aktualizacji wysłałby cały zbiór do zapoznania,
+        # łącznie z kartami dawno opanowanymi w pudełku 5.
+        conn.execute("UPDATE flashcards SET learned_at = created_at")
+
+    if "own_note" not in columns:
+        # Puste, nie NULL - tak samo jak questions.answer w migracji 4. "Jeszcze
+        # nie napisana" i "napisana, ale pusta" to dla nas ten sam stan.
+        conn.execute(
+            "ALTER TABLE flashcards ADD COLUMN own_note TEXT NOT NULL DEFAULT ''"
+        )
+
+
 MIGRATIONS = [
     _migration_1_initial_schema,
     _migration_2_activity_log,
     _migration_3_content_imports,
     _migration_4_question_answer,
     _migration_5_resources,
+    _migration_6_activity_kinds_without_check,
+    _migration_7_flashcard_learning,
 ]
 
 

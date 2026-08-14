@@ -10,6 +10,31 @@ def list_by_phase(conn: sqlite3.Connection, phase_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def list_for_session(
+    conn: sqlite3.Connection, phase_id: int, limit: int
+) -> list[sqlite3.Row]:
+    """Pytania do sesji dnia: najpierw nietknięte, potem najdawniej sprawdzane.
+
+    Losowanie byłoby prostsze, ale gorsze - przy kilkunastu pytaniach na fazę
+    losowa trójka regularnie omijałaby te, których nigdy nie próbowałeś, a to
+    właśnie one uczą najwięcej. `COALESCE` na pustym stringu, bo NULL sortuje
+    się w SQLite przed każdą datą i pytanie bez podejść i tak wychodzi pierwsze
+    dzięki liczbie podejść.
+    """
+    return conn.execute(
+        "SELECT questions.* FROM questions "
+        "LEFT JOIN question_attempts "
+        "       ON question_attempts.question_id = questions.id "
+        "WHERE questions.phase_id = ? "
+        "GROUP BY questions.id "
+        "ORDER BY COUNT(question_attempts.id), "
+        "         COALESCE(MAX(question_attempts.attempted_at), ''), "
+        "         questions.id "
+        "LIMIT ?",
+        (phase_id, limit),
+    ).fetchall()
+
+
 def create(
     conn: sqlite3.Connection,
     phase_id: int,

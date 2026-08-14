@@ -27,16 +27,55 @@ def get_due_cards(
     return flashcards_repo.list_due(conn, cutoff)
 
 
+def get_intro_cards(conn: sqlite3.Connection, limit: int) -> list[sqlite3.Row]:
+    return flashcards_repo.list_intro_queue(conn, limit)
+
+
 def create_card(
     conn: sqlite3.Connection,
     front: str,
     back: str,
     phase_id: int | None,
     today: date | None = None,
+    needs_intro: bool = False,
 ) -> int:
-    # Nowa fiszka jest due od razu (next_review_at = dziś).
+    """Nowa fiszka. `needs_intro=True` odkłada ją do przebiegu zapoznawczego.
+
+    Domyślne False jest świadome: fiszkę dopisaną ręcznie w aplikacji właśnie
+    napisałeś, czyli widziałeś obie strony - zapoznawanie z nią byłoby pustym
+    klikiem. Karty z content/ to cudze sformułowania, których jeszcze nie
+    czytałeś, więc import podaje True.
+    """
     due = (today or clock.today()).isoformat()
-    return flashcards_repo.create(conn, front, back, phase_id, due)
+    learned_at = None if needs_intro else clock.now_iso()
+    return flashcards_repo.create(conn, front, back, phase_id, due, learned_at)
+
+
+def record_intro(
+    conn: sqlite3.Connection, card_id: int, today: date | None = None
+) -> bool:
+    """Zamyka przebieg zapoznawczy: karta wchodzi do pudełka 1 i normalnej rotacji.
+
+    Bez oceniania - "widziałem to pierwszy raz" nie jest ani sukcesem, ani
+    porażką. Termin liczymy interwałem pudełka 1, więc zapoznana dziś karta
+    wraca nazajutrz, dokładnie jak po udanej powtórce w pudełku 1.
+    """
+    card = flashcards_repo.get(conn, card_id)
+    if card is None:
+        return False
+
+    reference = today or clock.today()
+    flashcards_repo.mark_learned(
+        conn,
+        card_id,
+        clock.now_iso(),
+        MIN_BOX,
+        next_review_date(MIN_BOX, reference).isoformat(),
+    )
+    # Zapoznanie liczy się do dziennika: to realna nauka, a dziennik odpowiada
+    # na pytanie "czy tego dnia się uczyłem", nie "czy zdałem test".
+    activity_repo.log(conn, activity_repo.KIND_CARD_INTRO, card_id, card["front"])
+    return True
 
 
 def record_review(

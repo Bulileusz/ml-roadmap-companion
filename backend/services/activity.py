@@ -1,7 +1,12 @@
 import sqlite3
 from datetime import date
 
-from repository import activity_repo, question_attempts_repo, tasks_repo
+from repository import (
+    activity_repo,
+    question_attempts_repo,
+    resources_repo,
+    tasks_repo,
+)
 from services import clock, streak
 
 # Jedyny punkt zapisu do dziennika po stronie tasków i pytań. UI woła te
@@ -29,6 +34,28 @@ def record_question_attempt(
         question["id"],
         question["question_text"],
     )
+
+
+def record_resource_status(
+    conn: sqlite3.Connection, resource: sqlite3.Row, status: str
+) -> None:
+    """Zmiana statusu materiału; do dziennika trafia tylko przejście na "przerobione".
+
+    "Zacząłem czytać" i "przestawiłem z powrotem na do zrobienia" to nie
+    wydarzenia dnia nauki - zaśmiecałyby dziennik i sztucznie podbijały serię.
+    Domknięcie materiału jest realnym osiągnięciem i dlatego jest logowane.
+    """
+    resources_repo.update_status(conn, resource["id"], status)
+    if (
+        status == resources_repo.STATUS_DONE
+        and resource["status"] != resources_repo.STATUS_DONE
+    ):
+        activity_repo.log(
+            conn,
+            activity_repo.KIND_RESOURCE_DONE,
+            resource["id"],
+            resource["title"],
+        )
 
 
 def get_streak(conn: sqlite3.Connection, today: date | None = None) -> dict:

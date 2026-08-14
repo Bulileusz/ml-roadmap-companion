@@ -99,41 +99,38 @@ def test_sync_imports_flashcards_and_questions(seeded, content_root):
     assert sorted(types) == ["code", "concept"]
 
 
-def test_first_imported_cards_are_due_today(seeded, content_root):
-    _write(content_root, "flashcards", "0-python.md", "## Przód\nTył\n")
-
-    content.sync(seeded, content_root, today=date(2026, 3, 15))
-
-    card = flashcards_repo.list_all(seeded)[0]
-    assert card["box"] == 1
-    assert card["next_review_at"] == "2026-03-15"
-
-
-def test_import_staggers_new_cards_across_days(seeded, content_root):
-    count = content.NEW_CARDS_PER_DAY * 2 + 1
-    body = "".join(f"## Przód {index}\nTył {index}\n\n" for index in range(count))
+def test_imported_cards_go_to_the_intro_queue(seeded, content_root):
+    # Zastępuje dawny test_import_staggers_new_cards_across_days. Rozkładanie
+    # importu na dni chroniło przed lawiną powtórek pierwszego dnia; teraz robi
+    # to kolejka zapoznawcza, i robi to lepiej - karta nie jest wymagalna,
+    # dopóki jej nie poznasz, niezależnie od tego, ile ich wgrałeś.
+    body = "".join(f"## Przód {index}\nTył {index}\n\n" for index in range(25))
     _write(content_root, "flashcards", "0-python.md", body)
 
     content.sync(seeded, content_root, today=date(2026, 3, 15))
 
-    dates = [card["next_review_at"] for card in flashcards_repo.list_all(seeded)]
-    # Pierwsza porcja dziś, druga jutro, reszta pojutrze - żeby wgranie
-    # startera nie dało kilkudziesięciu powtórek pierwszego dnia.
-    assert dates.count("2026-03-15") == content.NEW_CARDS_PER_DAY
-    assert dates.count("2026-03-16") == content.NEW_CARDS_PER_DAY
-    assert dates.count("2026-03-17") == 1
+    assert flashcards_repo.count_intro_queue(seeded) == 25
+    assert flashcards_repo.count_due(seeded, "2026-03-15") == 0
+    # Termin jest ustawiony na dziś, ale to learned_at trzyma kartę poza
+    # powtórkami - po zapoznaniu wejdzie do rotacji bez sztucznego opóźnienia.
+    dates = {card["next_review_at"] for card in flashcards_repo.list_all(seeded)}
+    assert dates == {"2026-03-15"}
+    assert {card["box"] for card in flashcards_repo.list_all(seeded)} == {1}
 
 
-def test_manual_cards_stay_due_immediately(seeded, content_root):
-    # Stagger dotyczy tylko importu - ręczne dodanie fiszki to świadoma
-    # decyzja i ma być wymagalne od razu.
+def test_manual_cards_skip_the_intro_and_are_due_immediately(seeded, content_root):
+    # Fiszkę dopisaną ręcznie właśnie napisałeś, czyli widziałeś obie strony -
+    # przebieg zapoznawczy byłby pustym klikiem. Import to co innego: tam czyta
+    # się cudze sformułowanie po raz pierwszy.
     from services import spaced_repetition
 
     spaced_repetition.create_card(
         seeded, "Ręczna", "Tył", None, today=date(2026, 3, 15)
     )
 
+    assert flashcards_repo.count_intro_queue(seeded) == 0
     assert flashcards_repo.list_all(seeded)[0]["next_review_at"] == "2026-03-15"
+    assert flashcards_repo.count_due(seeded, "2026-03-15") == 1
 
 
 def test_sync_is_idempotent(seeded, content_root):

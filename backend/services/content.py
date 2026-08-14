@@ -1,7 +1,7 @@
 import re
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 from repository import (
@@ -20,12 +20,13 @@ CONTENT_ROOT = Path(__file__).resolve().parents[2] / "content"
 DEFAULT_QUESTION_TYPE = "concept"
 QUESTION_TYPES = ("concept", "code")
 
-# Ile świeżo zaimportowanych fiszek staje się wymagalnych tego samego dnia.
-# Wrzucenie startera bez tego dałoby kilkadziesiąt powtórek pierwszego dnia -
-# a lawina na starcie to najczęstszy powód porzucenia spaced repetition.
-# Kolejne partie dostają kolejne dni; fiszka dodana ręcznie w UI dalej jest
-# wymagalna od razu, bo to świadoma decyzja użytkownika.
-NEW_CARDS_PER_DAY = 10
+# Rozkładanie importu na dni (NEW_CARDS_PER_DAY) odeszło razem z wejściem
+# przebiegu zapoznawczego. Chroniło przed lawiną powtórek po wgraniu startera,
+# ale ten sam skutek daje teraz kolejka zapoznawcza: zaimportowana karta nie
+# jest wymagalna, dopóki jej nie poznasz, a limit na sesję siedzi w
+# services/session.py. Dwa throttle naraz tylko przeszkadzały sobie wzajemnie -
+# fiszka odłożona o pięć dni *i* czekająca na zapoznanie znikała z widoku
+# na tydzień bez powodu.
 
 _SECTION = re.compile(r"^##[ \t]+(.*)$", re.MULTILINE)
 _TYPE_TAG = re.compile(r"^\[(\w+)\]\s*(.*)$")
@@ -137,8 +138,9 @@ def _sync_flashcards(
             # Najpierw treść, potem ewidencja: awaria między tymi krokami
             # oznacza duplikat przy następnym starcie (do skasowania w UI),
             # a nie bezpowrotnie zgubioną fiszkę.
-            due = today + timedelta(days=result.flashcards_added // NEW_CARDS_PER_DAY)
-            spaced_repetition.create_card(conn, front, back, phase_ids[code], today=due)
+            spaced_repetition.create_card(
+                conn, front, back, phase_ids[code], today=today, needs_intro=True
+            )
             content_imports_repo.mark_imported(
                 conn, content_imports_repo.KIND_FLASHCARD, key
             )
