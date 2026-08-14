@@ -1,6 +1,17 @@
 # Osobny plik zamiast pyproject.toml, żeby nie ruszać działającego pytest.ini.
 line-length = 88
 
+# Korzeń kodu źródłowego. Bez tego isort (reguła I) po przenosinach do backend/
+# uznałby `db`, `repository`, `services` i `api` za paczki zewnętrzne i chciał
+# przesortować importy w połowie plików - to samo miejsce, które pytest.ini
+# podaje jako pythonpath.
+src = ["backend"]
+
+# Materiały do nauki w content/ to Markdown z blokami kodu, których ruff od 0.16
+# potrafi dotknąć przy formatowaniu. Notatki mają zostać dokładnie tak, jak je
+# napisałem - listing w nich jest treścią, nie kodem projektu.
+extend-exclude = ["content", ".venv", "frontend"]
+
 [lint]
 # E/F - pycodestyle + pyflakes (baza), I - kolejność importów,
 # UP - modernizacja składni pod aktualnego Pythona, B - typowe pułapki
@@ -12,5 +23,5 @@ select = ["E", "F", "I", "UP", "B"]
 # w jednym kawałku (łamanie CHECK-a czy CREATE INDEX psuje czytelność
 # schematu), a tytuły zadań w seedzie to zdania po polsku - zawijanie ich
 # konkatenacją utrudniłoby wyszukiwanie po treści.
-"db/schema.py" = ["E501"]
-"db/seed_data.py" = ["E501"]
+"backend/db/schema.py" = ["E501"]
+"backend/db/seed_data.py" = ["E501"]

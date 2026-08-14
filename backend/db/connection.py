@@ -1,7 +1,11 @@
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "roadmap.db"
+# parents[2], nie parent.parent: ten plik leży w backend/db/, a baza ma zostać
+# w data/ w korzeniu repo - wspólnym dla backendu i frontu. Policzenie ścieżki
+# od backend/ dałoby drugą, pustą bazę w backend/data/ i po cichu osierociło
+# tę prawdziwą. Pilnuje tego tests/test_paths.py.
+DB_PATH = Path(__file__).resolve().parents[2] / "data" / "roadmap.db"
 
 
 def get_connection(db_path: str | Path = DB_PATH) -> sqlite3.Connection:

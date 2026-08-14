@@ -12,7 +12,10 @@ from repository import (
 )
 from services import clock, spaced_repetition
 
-CONTENT_ROOT = Path(__file__).resolve().parent.parent / "content"
+# parents[2] z tego samego powodu co DB_PATH: content/ zostaje w korzeniu repo,
+# bo to treść edytowana też z zewnątrz (webowy edytor GitHuba), a nie część
+# kodu backendu. Pilnuje tego tests/test_paths.py.
+CONTENT_ROOT = Path(__file__).resolve().parents[2] / "content"
 
 DEFAULT_QUESTION_TYPE = "concept"
 QUESTION_TYPES = ("concept", "code")
