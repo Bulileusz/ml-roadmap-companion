@@ -4,18 +4,47 @@ venv/
 __pycache__/
 *.pyc
 
-# Streamlit
-.streamlit/secrets.toml
-
 # Local data (SQLite database + WAL sidecars + kopie sprzed importu)
 *.db
 data/*.db
 *.db-wal
 *.db-shm
 *.db.bak-*
+# Dzienne migawki JSON zapisywane przy starcie backendu (services/backup.py).
+data/snapshots/
 
 # Env
 .env
 
 # OS
 .DS_Store
+
+# --- dev-scaffold: dopiski (agent/sekrety) ---
+.env.*
+*.key
+*.pem
+.claude/settings.local.json
+CLAUDE.local.md
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+node_modules/
+npm-debug.log*
+.npm/
+.next/
+.vercel/
+dist/
+build/
+target/
+out/
+*.log
+
+# Frontend (Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+# Wygenerowany przez `make api-types` półprodukt. Do repo trafia dopiero
+# frontend/src/api/schema.d.ts, żeby front dał się zbudować bez Pythona.
+frontend/openapi.json
+frontend/*.tsbuildinfo

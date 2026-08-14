@@ -1,0 +1,5 @@
+fastapi==0.141.*
+uvicorn[standard]==0.52.*
+# Wymagane przez FastAPI do UploadFile - import kopii zapasowej idzie
+# multipartem, a bez tej paczki endpoint wywala się na starcie, nie w runtime.
+python-multipart==0.0.32

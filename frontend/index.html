@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Ciemne tło deklarowane też tutaj: bez tego przeglądarka maluje białą
+         stronę na moment przed wczytaniem CSS-u, co przy ciemnym motywie jest
+         błyskiem w oczy przy każdym odświeżeniu. -->
+    <meta name="color-scheme" content="dark" />
+    <title>ML Roadmap Companion</title>
+    <style>
+      html {
+        background: #0b0d12;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
