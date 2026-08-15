@@ -114,6 +114,11 @@ zrobionych w aplikacji i **nie wskrzesza pozycji skasowanych w UI**. Kluczem jes
 przód fiszki w obrębie fazy — poprawka tyłu w pliku nie trafi do bazy, zmiana
 przodu tworzy nową pozycję. Pełny opis formatu: `content/README.md`.
 
+**Aplikacja nie tworzy fiszek — to świadoma decyzja.** W bibliotece można je
+edytować, przepiąć do innej fazy i usunąć, ale nowe wchodzą wyłącznie z
+`content/`. Dzięki temu treść ma jedno źródło prawdy w gicie, a nie dwa
+rozjeżdżające się: pliki i bazę, której nikt nie backupuje.
+
 ## Kopie zapasowe
 
 Trzy warstwy, bo historia nauki istnieje w jednej kopii — `data/roadmap.db` nie
