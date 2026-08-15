@@ -14,6 +14,7 @@ ALL_TABLES = {
     "activity_log",
     "content_imports",
     "resources",
+    "day_notes",
 }
 
 

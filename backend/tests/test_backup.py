@@ -8,6 +8,7 @@ from db.connection import get_connection
 from db.schema import init_db
 from repository import (
     activity_repo,
+    day_notes_repo,
     flashcards_repo,
     question_attempts_repo,
     questions_repo,
@@ -36,12 +37,14 @@ def _populate(conn):
     activity_repo.log(
         conn, activity_repo.KIND_TASK_DONE, task_id, "NumPy: broadcasting"
     )
+    day_notes_repo.upsert(conn, "2026-03-14", "Broadcasting wreszcie kliknęło.")
     return phase_id, task_id, question_id
 
 
 def _snapshot(conn):
-    # content_imports nie ma kolumny id (klucz to para kind+item_key).
-    orders = {"content_imports": "kind, item_key"}
+    # Nie każda tabela ma kolumnę id: content_imports jest kluczowane parą
+    # kind+item_key, a day_notes samą datą.
+    orders = {"content_imports": "kind, item_key", "day_notes": "day"}
     return {
         table: [
             dict(row)
@@ -64,6 +67,23 @@ def test_export_covers_every_table(conn):
         payload["schema_version"] == conn.execute("PRAGMA user_version").fetchone()[0]
     )
     assert backup.summarize(payload)["tasks"] == 1
+
+
+def test_file_without_tables_added_later_still_imports(conn, tmp_path):
+    _populate(conn)
+    payload = backup.export_data(conn)
+    # Plik wyeksportowany, zanim doszły notatki do dni - dokładnie to leży
+    # w data/snapshots u kogoś, kto nie aktualizował apki od kwietnia.
+    del payload["tables"]["day_notes"]
+
+    target = get_connection(tmp_path / "starszy.db")
+    init_db(target)
+    summary = backup.import_data(target, payload)
+
+    assert backup.problem_with(target, payload) is None
+    assert summary["day_notes"] == 0
+    assert target.execute("SELECT COUNT(*) FROM phases").fetchone()[0] == 1
+    target.close()
 
 
 def test_export_json_is_readable_utf8(conn):

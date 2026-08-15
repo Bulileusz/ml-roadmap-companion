@@ -303,6 +303,23 @@ def _migration_7_flashcard_learning(conn: sqlite3.Connection) -> None:
         )
 
 
+# Notatka do dnia nauki - jedyna rzecz w dzienniku, której nie da się wyliczyć
+# z activity_log. Klucz to sama data ("RRRR-MM-DD"), bo dzień ma najwyżej jedną
+# notatkę: dziennik jest zapisem dni, nie strumieniem wpisów.
+_CREATE_DAY_NOTES = """
+CREATE TABLE IF NOT EXISTS day_notes (
+    day         TEXT PRIMARY KEY,
+    note        TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+"""
+
+
+def _migration_8_day_notes(conn: sqlite3.Connection) -> None:
+    conn.execute(_CREATE_DAY_NOTES)
+
+
 MIGRATIONS = [
     _migration_1_initial_schema,
     _migration_2_activity_log,
@@ -311,6 +328,7 @@ MIGRATIONS = [
     _migration_5_resources,
     _migration_6_activity_kinds_without_check,
     _migration_7_flashcard_learning,
+    _migration_8_day_notes,
 ]
 
 

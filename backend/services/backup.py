@@ -20,6 +20,22 @@ TABLES = [
     # o tym, co już wjechało z content/, i przy najbliższym starcie
     # zaimportowałoby wszystko drugi raz - obok wierszy z backupu.
     "content_imports",
+    "day_notes",
+]
+
+# Tabele, bez których plik jest niekompletny. Nie to samo co TABLES: day_notes
+# doszło już po wydaniu formatu 1, więc eksport zrobiony wcześniej po prostu nie
+# ma takiej sekcji. Odrzucanie go byłoby karą za to, że kopia jest starsza niż
+# apka - a to dokładnie ta sytuacja, w której kopii się używa.
+REQUIRED_TABLES = [
+    "phases",
+    "tasks",
+    "flashcards",
+    "questions",
+    "question_attempts",
+    "resources",
+    "activity_log",
+    "content_imports",
 ]
 
 FORMAT_VERSION = 1
@@ -85,7 +101,7 @@ def _validate(conn: sqlite3.Connection, payload: dict) -> None:
     tables = payload.get("tables")
     if not isinstance(tables, dict):
         raise BackupError("Brak sekcji 'tables' w pliku.")
-    missing = [table for table in TABLES if table not in tables]
+    missing = [table for table in REQUIRED_TABLES if table not in tables]
     if missing:
         raise BackupError(f"W pliku brakuje tabel: {', '.join(missing)}.")
 
@@ -122,7 +138,9 @@ def import_data(conn: sqlite3.Connection, payload: dict) -> dict[str, int]:
             conn.execute(f"DELETE FROM {table}")
 
         for table in TABLES:
-            rows = tables[table]
+            # .get, nie [table]: sekcji dopisanych po formacie 1 może w pliku
+            # nie być - wtedy tabela zostaje pusta, tak jak przed ich istnieniem.
+            rows = tables.get(table, [])
             if not rows:
                 continue
             # id zachowujemy celowo: bez tego rozjechałyby się wszystkie

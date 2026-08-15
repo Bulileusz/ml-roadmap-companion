@@ -45,6 +45,21 @@ def count_overall(conn: sqlite3.Connection) -> tuple[int, int]:
     return row["independent"], row["total"]
 
 
+def stats_per_day(conn: sqlite3.Connection, since: str) -> dict[str, tuple[int, int]]:
+    """Dzień -> (samodzielne, wszystkie) podejścia, od `since` (RRRR-MM-DD).
+
+    Liczymy z question_attempts, nie z activity_log: dziennik zapisuje sam fakt
+    podejścia, a to, czy poszło samodzielnie, siedzi wyłącznie tutaj.
+    """
+    rows = conn.execute(
+        "SELECT DATE(attempted_at) AS day, COUNT(*) AS total, "
+        "COALESCE(SUM(solved_independently), 0) AS independent "
+        "FROM question_attempts WHERE DATE(attempted_at) >= ? GROUP BY day",
+        (since,),
+    ).fetchall()
+    return {row["day"]: (row["independent"], row["total"]) for row in rows}
+
+
 def create(
     conn: sqlite3.Connection, question_id: int, solved_independently: bool
 ) -> int:

@@ -9,7 +9,9 @@ def test_status_reports_files_next_to_what_is_already_imported(client, seeded):
     assert status["available"]["flashcards"] > 0
     assert status["available"]["questions"] > 0
     assert status["available"]["resources"] > 0
-    assert status["imported"] == {}
+    # Przed pierwszym importem zera, nie pusty słownik: obie połówki wiersza na
+    # stronie Dane mówią tym samym słownikiem, żeby dały się zestawić.
+    assert status["imported"] == {"flashcards": 0, "questions": 0, "resources": 0}
 
 
 def test_sync_imports_the_repo_content_and_is_idempotent(client, db, seeded):
@@ -48,6 +50,7 @@ def test_status_after_sync_shows_what_landed(client, db, seeded):
     status = client.get("/api/content/status").json()
 
     phase_id = db.execute("SELECT id FROM phases WHERE code = '0'").fetchone()["id"]
-    assert status["imported"]["flashcard"] == status["available"]["flashcards"]
+    assert status["imported"]["flashcards"] == status["available"]["flashcards"]
+    assert status["imported"]["resources"] == status["available"]["resources"]
     assert questions_repo.list_by_phase(db, phase_id)
     assert resources_repo.list_by_phase(db, phase_id)

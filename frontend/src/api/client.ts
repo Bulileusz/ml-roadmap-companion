@@ -67,6 +67,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
+/** Nazwa pliku z Content-Disposition; bez niej przeglądarka zapisze „export". */
+function filenameFrom(header: string | null, fallback: string): string {
+  const match = header?.match(/filename="?([^"]+)"?/)
+  return match?.[1] ?? fallback
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
@@ -77,10 +83,38 @@ export const api = {
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   del: (path: string) => request<void>(path, { method: 'DELETE' }),
+  put: <T>(path: string, body: unknown) =>
+    request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   upload: <T>(path: string, file: File) => {
     const form = new FormData()
     form.append('file', file)
     // Bez Content-Type: przeglądarka musi sama dorobić boundary multiparta.
     return request<T>(path, { method: 'POST', body: form })
+  },
+
+  /**
+   * Pobranie pliku z odpowiedzi, nie z linku.
+   *
+   * `<a href="/api/backup/export" download>` wyglądałoby prościej, ale przy
+   * błędzie serwera przeglądarka zapisałaby na dysk stronę błędu pod nazwą
+   * kopii zapasowej. Przez fetch błąd jest błędem i widać go w interfejsie.
+   */
+  download: async (path: string, fallbackName: string) => {
+    const response = await fetch(path)
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null)
+      throw new ApiError(response.status, readDetail(payload, response.status))
+    }
+    const blob = await response.blob()
+    const name = filenameFrom(response.headers.get('Content-Disposition'), fallbackName)
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = name
+    anchor.click()
+    // Zwolnienie w mikrozadaniu: kliknięcie jest synchroniczne, ale samo
+    // pobieranie startuje po nim — natychmiastowe revoke potrafi je uciąć.
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+    return name
   },
 }
