@@ -3,6 +3,8 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
+  "//types": "Drzewo .d.ts generowane przez .design-sync/build-inputs.mjs — czyta je wyłącznie import systemu designu (design-sync), aplikacja nie publikuje typów.",
+  "types": ".design-sync/.cache/types/index.d.ts",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

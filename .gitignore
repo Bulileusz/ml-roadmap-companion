@@ -48,3 +48,12 @@ frontend/coverage/
 # frontend/src/api/schema.d.ts, żeby front dał się zbudować bez Pythona.
 frontend/openapi.json
 frontend/*.tsbuildinfo
+
+# --- design-sync (import systemu designu do claude.ai/design) ---
+# Sklonowane skrypty konwertera, generowany bundle i stan maszyny. Trwałe
+# wejścia (config.json, NOTES.md, previews/, conventions.md) zostają w repo.
+frontend/.ds-sync/
+frontend/ds-bundle/
+frontend/.design-sync/.cache/
+frontend/.design-sync/learnings/
+frontend/.design-sync/node_modules
