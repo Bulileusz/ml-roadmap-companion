@@ -114,6 +114,48 @@ Brak. Ostatnia walidacja wyszła całkiem czysta (`✓ bundle is complete`, bez
 ostrzeżeń), 17/17 kart renderuje się poprawnie. **Każde ostrzeżenie przy
 kolejnym syncu jest więc nowe** i trzeba mu się przyjrzeć.
 
+Uwaga: dotyczy ostrzeżeń **walidacji**. Uwagi z panelu Design o liście tokenów
+to co innego i mają własną sekcję niżej — tam wnioskiem jest „nie ścigać".
+
+## Śmieci w liście tokenów — oczekiwane, NIE ścigać
+
+Panel Design pokazuje w tokenach ~60 wewnętrznych zmiennych Tailwinda obok ~54
+prawdziwych: 55 `--tw-*` (cienie, gradienty, transformy, `--tw-space-y-reverse`),
+4 `--default-*` i `--animate-pulse`. Raport wypisuje też „theme scopes" z
+selektorami utility (`.-translate-x-1\/2`, `.bg-gradient-to-r`) i osobno 8
+wystąpień `--tw-space-y-reverse` pod `:where(.space-y-* > :not(:last-child))`.
+
+**To jest udokumentowane zachowanie narzędzia, nie usterka tego repo.**
+`lib/css.mjs` skilla, komentarz nad `writeStylesCss`: *„the app's scope filter is
+a permissive heuristic (…) so public component vars from the bundle DO enter the
+token list. That's tolerable (they're real, usable vars) and the price of designs
+actually receiving component CSS."*
+
+Sprawdzone 2026-08-15, żeby nie sprawdzać drugi raz:
+
+- **Nie ma konwencji `/* @kind … */`.** `grep -rno "@[a-z-]*kind[a-z-]*"` po całym
+  skillu (`package-*.mjs`, `resync.mjs`, `lib/*.mjs`, oba pod-skille) — zero
+  trafień. Post-processing `compiled.css` dokładający taki marker jest no-opem.
+- **Nie ma opcji wykluczania tokenów w configu.** Lista dozwolonych kluczy
+  (`lib/common.mjs`) ma `tokensPkg`/`tokensGlob`, ale one wybierają tylko, które
+  pliki *osobnego pakietu tokenów* skopiować do `tokens/` — nie filtrują custom
+  properties. U nas i tak martwe: `tokensPkg` nie jest ustawione, CSS wchodzi
+  przez `cssEntry`.
+- **Jedyna dźwignia to nie wysyłać `_ds_bundle.css`** w domknięciu `@import`
+  z `styles.css` — a wtedy, wprost z tego samego komentarza, component CSS nigdy
+  nie dociera do projektów agenta. Czyli wszystko renderuje się bez stylów.
+  Wymiana katastrofalna za porządek w liście.
+
+`package-validate.mjs` nie ma **żadnego** ostrzeżenia o nadmiarowych tokenach —
+jedyne token-owe to `[TOKENS_MISSING]`, czyli problem odwrotny (zmienna używana,
+ale nigdzie niezdefiniowana). Jeśli walidacja wychodzi czysta, lista tokenów jest
+w porządku, choćby panel pokazywał w niej śmieci.
+
+Dałoby się uciąć 8 z 60, zamieniając `space-y-*` na `flex flex-col gap-*`
+(16 miejsc w `src/` i podglądach) — `gap` nie generuje custom properties. Zmiana
+broni się sama jako idiom, ale jako sprzątanie raportu jest nieopłacalna: reszta
+52 bierze się z cieni, gradientów i transformów, których i tak nie usuwamy.
+
 ## Ryzyka przy kolejnym syncu
 
 - **`.ds-sync/syslibs` znika po klonie.** Bez niego nie ma żadnej weryfikacji
