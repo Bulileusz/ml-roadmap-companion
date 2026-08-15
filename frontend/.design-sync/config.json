@@ -11,9 +11,6 @@
     "component": "DesignPreviewProvider"
   },
   "overrides": {
-    "StatCard": {
-      "cardMode": "column"
-    },
     "HotkeyCheatsheet": {
       "cardMode": "single",
       "primaryStory": "Otwarta",
@@ -37,11 +34,8 @@
     "Skeleton": "src/components/ui/primitives.tsx",
     "Kbd": "src/components/ui/primitives.tsx",
     "ProgressRing": "src/components/ui/ProgressRing.tsx",
-    "StatCard": "src/components/StatCard.tsx",
-    "PhaseCard": "src/components/PhaseCard.tsx",
     "StreakFlame": "src/components/Progression.tsx",
     "LevelBar": "src/components/Progression.tsx",
-    "SessionHero": "src/components/SessionHero.tsx",
     "HotkeyCheatsheet": "src/components/HotkeyCheatsheet.tsx",
     "AppShell": "src/components/AppShell.tsx"
   },

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from db.connection import DB_PATH
+from db.connection import DB_ENV_VAR, DEFAULT_DB_PATH, resolve_db_path
 from services.content import CONTENT_ROOT
 
 # Dwie stałe liczone od __file__ przetrwały przenosiny kodu do backend/ tylko
@@ -13,7 +13,24 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_database_lives_in_repo_root_data():
-    assert DB_PATH == REPO_ROOT / "data" / "roadmap.db"
+    assert DEFAULT_DB_PATH == REPO_ROOT / "data" / "roadmap.db"
+
+
+def test_env_var_redirects_the_database(monkeypatch, tmp_path):
+    # Bez tej furtki każde ręczne sprawdzenie apki na żywym serwerze pisze do
+    # prawdziwej historii nauki - zdarzyło się raz i zostawiło w niej śmieciowe
+    # powtórki oraz cudzą notatkę w polu „moimi słowami".
+    monkeypatch.setenv(DB_ENV_VAR, str(tmp_path / "próba.db"))
+
+    assert resolve_db_path() == tmp_path / "próba.db"
+
+
+def test_empty_env_var_falls_back_to_the_real_database(monkeypatch):
+    # Pusta zmienna to najczęściej "export ML_ROADMAP_DB=" w skrypcie, a nie
+    # prośba o bazę w katalogu bieżącym.
+    monkeypatch.setenv(DB_ENV_VAR, "   ")
+
+    assert resolve_db_path() == DEFAULT_DB_PATH
 
 
 def test_content_root_is_the_repo_level_content_directory():

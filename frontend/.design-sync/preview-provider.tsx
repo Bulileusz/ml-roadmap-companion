@@ -5,7 +5,7 @@
 // dostawców, tylko bez montowania aplikacji - i z MemoryRouterem zamiast
 // BrowserRoutera, żeby podgląd nie dotykał adresu strony.
 //
-// Bez tego: PhaseCard wywala się na useQuery, AppShell i SessionHero na
+// Bez tego: komponenty czytające dane wywalają się na useQuery, a AppShell na
 // useNavigate, HotkeyCheatsheet na pustym rejestrze skrótów.
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -31,7 +31,7 @@ const client = new QueryClient({
   },
 })
 
-// Dosiane dane zamiast pustego cache'u: rozwinięty PhaseCard bez tego pokazałby
+// Dosiane dane zamiast pustego cache'u: podgląd czytający listę bez tego pokazałby
 // „ta faza nie ma jeszcze zadań", czyli stan pusty zamiast tego, co komponent
 // naprawdę robi - listy zadań z checkboxami w barwie fazy.
 client.setQueryData(keys.tasks(3), TASKS_PHASE_2)
@@ -40,7 +40,7 @@ export function DesignPreviewProvider({ children }: { children: ReactNode }) {
   return (
     // skipAnimations: karty podglądu to statyczne zrzuty, a harness robi je
     // zaraz po `networkidle` - w połowie animacji wejścia. Komponenty tej apki
-    // wjeżdżają z `opacity: 0`, więc bez tego SessionHero, StatCard i AllDone
+    // wjeżdżają z `opacity: 0`, więc bez tego AllDone i karty wyniku
     // fotografują się jako puste prostokąty. Opcja jest wprost od Motion pod
     // testy wizualne: wartości ustawiają się natychmiast na docelowe.
     <MotionConfig reducedMotion="user" skipAnimations>

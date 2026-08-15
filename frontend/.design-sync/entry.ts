@@ -10,10 +10,7 @@
 
 export * from '@/components/ui/primitives'
 export * from '@/components/ui/ProgressRing'
-export * from '@/components/StatCard'
-export * from '@/components/PhaseCard'
 export * from '@/components/Progression'
-export * from '@/components/SessionHero'
 export * from '@/components/HotkeyCheatsheet'
 export * from '@/components/AppShell'
 

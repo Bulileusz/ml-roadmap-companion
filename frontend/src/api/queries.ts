@@ -4,9 +4,18 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query'
+import { useCallback } from 'react'
 
 import { api } from './client'
-import type { Achievement, Dashboard, PhaseProgress, SessionPlan, Task } from './types'
+import type {
+  Achievement,
+  Dashboard,
+  Flashcard,
+  PhaseProgress,
+  QuestionStats,
+  SessionPlan,
+  Task,
+} from './types'
 
 export const keys = {
   dashboard: ['dashboard'] as const,
@@ -116,6 +125,50 @@ export function useToggleTask(phaseId: number) {
       invalidateProgress(client)
     },
   })
+}
+
+/**
+ * Mutacje sesji — świadomie BEZ unieważniania zapytań.
+ *
+ * `/api/session/today` jest przeliczane przy każdym pobraniu, więc unieważnienie
+ * go w środku sesji przetasowałoby kolejkę pod palcami: karta oceniona przed
+ * chwilą wypadłaby z planu, a licznik „3 z 12" zmienił się w trakcie.
+ * Kolejka jest snapshotem wziętym raz na starcie; reszta widoków dogania
+ * dopiero na `finishSession()`.
+ */
+export function useReviewCard() {
+  return useMutation({
+    mutationFn: ({ id, correct }: { id: number; correct: boolean }) =>
+      api.post<Flashcard>(`/api/flashcards/${id}/review`, { correct }),
+  })
+}
+
+export function useIntroduceCard() {
+  return useMutation({
+    mutationFn: (id: number) => api.post<Flashcard>(`/api/flashcards/${id}/intro`),
+  })
+}
+
+export function useSaveOwnNote() {
+  return useMutation({
+    mutationFn: ({ id, note }: { id: number; note: string }) =>
+      api.patch<Flashcard>(`/api/flashcards/${id}`, { own_note: note }),
+  })
+}
+
+export function useRecordAttempt() {
+  return useMutation({
+    mutationFn: ({ id, solo }: { id: number; solo: boolean }) =>
+      api.post<QuestionStats>(`/api/questions/${id}/attempts`, {
+        solved_independently: solo,
+      }),
+  })
+}
+
+/** Domknięcie sesji: dopiero teraz reszta apki ma prawo zobaczyć nowy stan. */
+export function useFinishSession() {
+  const client = useQueryClient()
+  return useCallback(() => invalidateProgress(client), [client])
 }
 
 export function useCreateTask(phaseId: number) {

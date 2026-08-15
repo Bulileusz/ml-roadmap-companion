@@ -10,6 +10,7 @@ Wszystko przez `make` z korzenia repo (`make help` wypisuje listę):
 - Testy: `make test` (pytest + vitest), osobno `make test-backend` / `make test-frontend`
 - Lint: `make lint` (ruff check + format --check, tsc, eslint), formatowanie: `make format`
 - Produkcyjnie lokalnie: `make run` — build frontu i uvicorn serwujący całość na :8000
+- **Ręczne sprawdzenie apki: `make smoke`** (baza w /tmp, port 8001). Nigdy `make run` do prób — pisze do prawdziwej historii nauki. Ścieżkę bazy nadpisuje `ML_ROADMAP_DB`.
 - Po zmianie `backend/api/schemas.py`: `make api-types` (przepisuje kontrakt na `frontend/src/api/schema.d.ts`; CI pilnuje, że są zgodne)
 
 ## Styl kodu
@@ -23,7 +24,10 @@ Wszystko przez `make` z korzenia repo (`make help` wypisuje listę):
 - `backend/db/` schemat + migracje na `PRAGMA user_version` (nigdy nie edytuj wydanej migracji, dopisuj na koniec `MIGRATIONS`), `backend/repository/` CRUD, `backend/services/` logika, `backend/api/` cienka warstwa HTTP.
 - Połączenie z bazą jest **na request** (`api/deps.py`), migracje/seed/import content/migawka raz w `lifespan`.
 - `data/` i `content/` leżą w korzeniu repo, nie w `backend/` — ścieżek pilnuje `backend/tests/test_paths.py`.
+- **Treść jest content-only**: nowe fiszki, pytania i materiały wchodzą wyłącznie z `content/`. Aplikacja pozwala je edytować i usuwać, ale nie dodawać — nie proponuj przycisku dodawania.
 - XP, poziomy i osiągnięcia są **wyliczane** z `activity_log` (`services/gamification.py`), nie przechowywane.
+- Sesja dnia: kolejka i wynik w czystym reduktorze (`frontend/src/lib/session-machine.ts`). Do backendu leci **tylko pierwsze podejście** do karty — powtórka w tej samej sesji jest ćwiczeniem, nie powtórką.
+- `frontend/src/api/schema.d.ts` jest generowany (`make api-types`) i wykluczony z Prettiera — sformatowanie rozjeżdża go z CI.
 
 ## Testy
 - pytest (`backend/tests/`, w tym `tests/api/` na TestClient) i vitest (`frontend/src/**/*.test.*`). Nowy kod wymaga testów. `make test` przed commitem.

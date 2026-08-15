@@ -59,6 +59,12 @@ run: build ## Cała apka na jednym porcie (uvicorn serwuje też frontend/dist)
 	@echo "apka → http://127.0.0.1:8000"
 	cd backend && ../$(PY) -m uvicorn api.main:app --port 8000
 
+smoke: build ## Cała apka na jednorazowej bazie w /tmp — NIE dotyka twoich danych
+	@echo "próbna apka → http://127.0.0.1:8001 (baza: /tmp/ml-roadmap-smoke.db)"
+	rm -f /tmp/ml-roadmap-smoke.db*
+	cd backend && ML_ROADMAP_DB=/tmp/ml-roadmap-smoke.db \
+		../$(PY) -m uvicorn api.main:app --port 8001
+
 api-types: ## Przepisz kontrakt FastAPI na typy TS (po każdej zmianie schemas.py)
 	cd backend && ../$(PY) -c "import json; from api.main import app; \
 		print(json.dumps(app.openapi(), ensure_ascii=False, indent=2))" \
