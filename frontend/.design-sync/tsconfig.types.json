@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "declarationDir": ".cache/types",
+    "rootDir": "..",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "types": ["node"]
+  },
+  "include": ["entry.ts", "preview-provider.tsx", "../src/**/*.ts", "../src/**/*.tsx"],
+  "exclude": ["../src/**/*.test.ts", "../src/**/*.test.tsx", "../src/test/**"]
+}

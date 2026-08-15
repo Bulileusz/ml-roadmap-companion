@@ -1,0 +1,53 @@
+{
+  "pkg": "ml-roadmap-frontend",
+  "globalName": "MLRoadmap",
+  "shape": "package",
+  "srcDir": "src/components",
+  "tsconfig": "tsconfig.json",
+  "buildCmd": "node .design-sync/build-inputs.mjs",
+  "cssEntry": ".design-sync/.cache/compiled.css",
+  "provider": {
+    "component": "DesignPreviewProvider"
+  },
+  "overrides": {
+    "StatCard": {
+      "cardMode": "column"
+    },
+    "HotkeyCheatsheet": {
+      "cardMode": "single",
+      "primaryStory": "Otwarta",
+      "viewport": "900x760"
+    },
+    "AppShell": {
+      "cardMode": "single",
+      "primaryStory": "Nawigacja",
+      "viewport": "1100x640"
+    }
+  },
+  "componentSrcMap": {
+    "DesignPreviewProvider": null,
+    "Card": "src/components/ui/primitives.tsx",
+    "Button": "src/components/ui/primitives.tsx",
+    "Badge": "src/components/ui/primitives.tsx",
+    "ProgressBar": "src/components/ui/primitives.tsx",
+    "AnimatedNumber": "src/components/ui/primitives.tsx",
+    "EmptyState": "src/components/ui/primitives.tsx",
+    "AllDone": "src/components/ui/primitives.tsx",
+    "Skeleton": "src/components/ui/primitives.tsx",
+    "Kbd": "src/components/ui/primitives.tsx",
+    "ProgressRing": "src/components/ui/ProgressRing.tsx",
+    "StatCard": "src/components/StatCard.tsx",
+    "PhaseCard": "src/components/PhaseCard.tsx",
+    "StreakFlame": "src/components/Progression.tsx",
+    "LevelBar": "src/components/Progression.tsx",
+    "SessionHero": "src/components/SessionHero.tsx",
+    "HotkeyCheatsheet": "src/components/HotkeyCheatsheet.tsx",
+    "AppShell": "src/components/AppShell.tsx"
+  },
+  "extraFonts": [
+    "node_modules/@fontsource-variable/inter/index.css",
+    "node_modules/@fontsource-variable/jetbrains-mono/index.css",
+    "node_modules/@fontsource-variable/plus-jakarta-sans/index.css"
+  ],
+  "readmeHeader": ".design-sync/conventions.md"
+}
