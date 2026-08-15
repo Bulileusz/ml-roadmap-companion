@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   BOX_INTERVALS_DAYS,
+  dueLabel,
+  todayISO,
   MAX_BOX,
   MIN_BOX,
   intervalDays,
@@ -60,5 +62,32 @@ describe('promotionLabel', () => {
 
   it('w ostatnim pudełku obiecuje to samo pudełko', () => {
     expect(promotionLabel(5)).toBe('za 14 dni · pudełko 5')
+  })
+})
+
+describe('dueLabel', () => {
+  const today = '2026-08-15'
+
+  it('rozróżnia dziś, jutro i dalej', () => {
+    expect(dueLabel('2026-08-15', today)).toBe('dziś')
+    expect(dueLabel('2026-08-16', today)).toBe('jutro')
+    expect(dueLabel('2026-08-19', today)).toBe('za 4 dni')
+  })
+
+  it('zaległość ma własne słowo, nie ujemne dni', () => {
+    expect(dueLabel('2026-08-14', today)).toBe('zaległa o 1 dzień')
+    expect(dueLabel('2026-08-12', today)).toBe('zaległa o 3 dni')
+  })
+
+  it('przechodzi przez granicę miesiąca', () => {
+    expect(dueLabel('2026-09-01', '2026-08-31')).toBe('jutro')
+  })
+})
+
+describe('todayISO', () => {
+  it('liczy czasem lokalnym, nie UTC', () => {
+    // 23:30 czasu lokalnego to wciąż ten sam dzień, choć w UTC bywa następny.
+    const late = new Date(2026, 7, 15, 23, 30)
+    expect(todayISO(late)).toBe('2026-08-15')
   })
 })

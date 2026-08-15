@@ -22,6 +22,7 @@ export const keys = {
   achievements: ['achievements'] as const,
   phases: ['phases'] as const,
   tasks: (phaseId: number) => ['phases', phaseId, 'tasks'] as const,
+  flashcards: ['flashcards'] as const,
   session: ['session', 'today'] as const,
 }
 
@@ -162,6 +163,45 @@ export function useRecordAttempt() {
       api.post<QuestionStats>(`/api/questions/${id}/attempts`, {
         solved_independently: solo,
       }),
+  })
+}
+
+export function useFlashcards() {
+  return useQuery({
+    queryKey: keys.flashcards,
+    queryFn: () => api.get<Flashcard[]>('/api/flashcards'),
+  })
+}
+
+/** Edycja fiszki w bibliotece. `phase_id: null` odpina ją od fazy. */
+export function useUpdateFlashcard() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: number
+      front?: string
+      back?: string
+      own_note?: string
+      phase_id?: number | null
+    }) => api.patch<Flashcard>(`/api/flashcards/${id}`, body),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.flashcards })
+      invalidateProgress(client)
+    },
+  })
+}
+
+export function useDeleteFlashcard() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.del(`/api/flashcards/${id}`),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.flashcards })
+      invalidateProgress(client)
+    },
   })
 }
 

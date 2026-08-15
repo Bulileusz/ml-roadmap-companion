@@ -286,7 +286,9 @@ class SessionPlan(BaseModel):
     intro: list[Flashcard]
     reviews: list[Flashcard]
     reviews_remaining: int
-    questions: list[Question]
+    # Ze statystykami, bo sesja pokazuje wskaźnik samodzielności PRZED
+    # odpowiedzią - to informacja o tym, czy z tym pytaniem masz historię.
+    questions: list[QuestionWithStats]
     phase: Phase | None
     next_task: NextTask | None
     total_steps: int

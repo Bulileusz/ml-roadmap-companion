@@ -60,12 +60,16 @@ def estimate_seconds(intro: int, reviews: int, questions: int) -> int:
 
 
 def plan(conn: sqlite3.Connection, today: date | None = None) -> dict:
-    """Plan dnia w trzech etapach: poznaj nowe, sprawdź pamięć, zmierz się z pytaniem.
+    """Plan dnia w trzech etapach: powtórki, zapoznania, pytania.
 
-    Kolejność jest celowa i odbija to, jak działa nauka: najpierw pierwszy
-    kontakt z materiałem (bez oceniania), potem wyciąganie z pamięci tego, co
-    już znasz, na końcu pytania wymagające złożenia kilku rzeczy razem. Zadanie
-    roadmapy jest dopisane na końcu jako drogowskaz, nie jako krok do odklikania.
+    Sam plan jest workiem trzech list - kolejność etapów układa front
+    (`lib/session-machine.ts`), bo to decyzja o przebiegu, nie o danych. Ale
+    warto ją tu zapisać, bo wynika z tego, co jest zobowiązaniem: **powtórki
+    idą pierwsze, bo mają termin**. Zapoznania są uznaniowe, więc gdy urwiesz
+    sesję w połowie, ma być zrobione to, co na dziś przypadało. Pytania na
+    końcu, bo wymagają złożenia kilku rzeczy naraz i są najdroższe poznawczo.
+
+    Zadanie roadmapy jest dopisane jako drogowskaz, nie jako krok do odklikania.
     """
     reference = today or clock.today()
 

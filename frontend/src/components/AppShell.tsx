@@ -36,7 +36,7 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
-      <Rail />
+      <Rail onHelp={() => setCheatsheetOpen(true)} />
       {/* Trasy same decydują o swoim układzie: strony treści biorą wąską
           kolumnę przez <Page>, a sesja wypełnia wysokość własnym flexem. */}
       <main className="flex min-w-0 flex-1 flex-col">
@@ -73,7 +73,7 @@ export function Page({ children }: { children: ReactNode }) {
   )
 }
 
-function Rail() {
+function Rail({ onHelp }: { onHelp: () => void }) {
   return (
     <nav
       className={cn(
@@ -104,9 +104,15 @@ function Rail() {
         </NavLink>
       ))}
 
-      <span className="ml-auto flex items-center pr-1 md:mt-auto md:ml-0 md:pl-[18px]">
+      {/* Klikalny, nie tylko podpowiedź: ściągawka ma być osiągalna także
+          bez znajomości skrótu, którego uczy. */}
+      <button
+        onClick={onHelp}
+        title="Skróty klawiszowe"
+        className="ml-auto flex cursor-pointer items-center pr-1 md:mt-auto md:ml-0 md:pl-[18px]"
+      >
         <Kbd>?</Kbd>
-      </span>
+      </button>
     </nav>
   )
 }
