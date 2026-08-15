@@ -9,7 +9,7 @@ import {
 } from '@/api/queries'
 import type { Flashcard, PhaseProgress } from '@/api/types'
 import { Page } from '@/components/AppShell'
-import { Badge, Kbd, Skeleton } from '@/components/ui/primitives'
+import { Badge, Chip, Kbd, Skeleton } from '@/components/ui/primitives'
 import { cn } from '@/lib/cn'
 import { useHotkeys } from '@/lib/hotkeys-context'
 import { dueLabel, todayISO } from '@/lib/leitner'
@@ -166,43 +166,6 @@ export function Fiszki() {
         ))
       )}
     </Page>
-  )
-}
-
-function Chip({
-  active,
-  color,
-  onClick,
-  children,
-  pill = true,
-}: {
-  active: boolean
-  color?: string
-  onClick: () => void
-  children: React.ReactNode
-  pill?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'flex shrink-0 items-center gap-2 border px-2.5 py-1.5 text-[0.72rem] transition',
-        pill ? 'rounded-full' : 'rounded-control',
-        active
-          ? 'bg-raised text-ink border-line-strong'
-          : 'border-line text-ink-muted hover:text-ink',
-      )}
-      style={active && color ? { borderColor: color } : undefined}
-    >
-      {color ? (
-        <span
-          className="size-1.5 shrink-0 rounded-full"
-          style={{ background: color }}
-          aria-hidden
-        />
-      ) : null}
-      {children}
-    </button>
   )
 }
 

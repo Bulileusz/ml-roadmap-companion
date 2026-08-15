@@ -96,6 +96,52 @@ export function Badge({
   )
 }
 
+/**
+ * Filtr na pasku nad listą: faza, pudełko, status, typ pytania.
+ *
+ * Wspólny dla wszystkich bibliotek (fiszki, pytania, materiały) - te ekrany
+ * mają wyglądać jak jedno miejsce z trzema zakładkami, a nie jak trzy osobne
+ * aplikacje. `color` maluje kropkę i krawędź wybranego filtra barwą fazy.
+ */
+export function Chip({
+  active,
+  color,
+  onClick,
+  children,
+  pill = true,
+}: {
+  active: boolean
+  color?: string
+  onClick: () => void
+  children: ReactNode
+  /** Prostokątny wariant dla filtrów, które są skalą, nie kategorią. */
+  pill?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'flex shrink-0 items-center gap-2 border px-2.5 py-1.5 text-[0.72rem] transition',
+        pill ? 'rounded-full' : 'rounded-control',
+        active
+          ? 'bg-raised text-ink border-line-strong'
+          : 'border-line text-ink-muted hover:text-ink',
+      )}
+      style={active && color ? { borderColor: color } : undefined}
+    >
+      {color ? (
+        <span
+          className="size-1.5 shrink-0 rounded-full"
+          style={{ background: color }}
+          aria-hidden
+        />
+      ) : null}
+      {children}
+    </button>
+  )
+}
+
 /** Poziomy pasek postępu - tam, gdzie pierścień byłby przesadą. */
 export function ProgressBar({
   pct,

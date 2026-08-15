@@ -38,6 +38,12 @@ export const ATTEMPTS: PolishForms = {
   many: 'podejść',
 }
 export const MINUTES: PolishForms = { one: 'minuta', few: 'minuty', many: 'minut' }
+export const REVIEWS: PolishForms = {
+  one: 'powtórka',
+  few: 'powtórki',
+  many: 'powtórek',
+}
+export const ENTRIES: PolishForms = { one: 'wpis', few: 'wpisy', many: 'wpisów' }
 export const RESOURCES: PolishForms = {
   one: 'materiał',
   few: 'materiały',

@@ -260,6 +260,27 @@ def sync(
     return result
 
 
+# Ewidencja importów nazywa rodzaje w liczbie pojedynczej ("flashcard"), bo
+# opisuje pojedynczy wiersz; licznik plików mówi w mnogiej ("flashcards"), bo
+# opisuje katalog. Obie nazwy są u siebie poprawne, ale strona Dane zestawia je
+# w jednym wierszu - tu jest jedyne przejście między tymi słownikami.
+_IMPORT_KIND_TO_GROUP = {
+    content_imports_repo.KIND_FLASHCARD: "flashcards",
+    content_imports_repo.KIND_QUESTION: "questions",
+    content_imports_repo.KIND_RESOURCE: "resources",
+}
+
+
+def imported_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    """Ile pozycji już wjechało z content/, w słowniku licznika plików.
+
+    Zawsze wszystkie trzy klucze, także z zerami: "0 wczytanych" to prawdziwy
+    stan przed pierwszym importem, a brak klucza wyglądałby na brak danych.
+    """
+    counts = content_imports_repo.count_by_kind(conn)
+    return {group: counts.get(kind, 0) for kind, group in _IMPORT_KIND_TO_GROUP.items()}
+
+
 def available_counts(root: Path | None = None) -> dict[str, int]:
     """Ile pozycji leży w plikach - do pokazania obok liczby zaimportowanych."""
     root = root or CONTENT_ROOT

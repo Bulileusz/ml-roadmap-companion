@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 from api import schemas
 from api.deps import DbConn
-from repository import content_imports_repo
 from services import content
 
 router = APIRouter(prefix="/content", tags=["content"])
@@ -12,7 +11,7 @@ router = APIRouter(prefix="/content", tags=["content"])
 def get_status(conn: DbConn):
     return {
         "available": content.available_counts(),
-        "imported": content_imports_repo.count_by_kind(conn),
+        "imported": content.imported_counts(conn),
     }
 
 

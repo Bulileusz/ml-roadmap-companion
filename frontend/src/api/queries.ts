@@ -9,10 +9,19 @@ import { useCallback } from 'react'
 import { api } from './client'
 import type {
   Achievement,
+  BackupImportResult,
+  BackupPreview,
+  ContentStatus,
+  ContentSyncResult,
   Dashboard,
+  DayNote,
   Flashcard,
+  JournalDay,
   PhaseProgress,
+  Question,
   QuestionStats,
+  QuestionWithStats,
+  Resource,
   SessionPlan,
   Task,
 } from './types'
@@ -24,6 +33,10 @@ export const keys = {
   tasks: (phaseId: number) => ['phases', phaseId, 'tasks'] as const,
   flashcards: ['flashcards'] as const,
   session: ['session', 'today'] as const,
+  questions: (phaseId: number) => ['questions', phaseId] as const,
+  resources: (phaseId: number) => ['resources', phaseId] as const,
+  journal: (days: number) => ['journal', 'days', days] as const,
+  content: ['content', 'status'] as const,
 }
 
 export function useDashboard() {
@@ -62,12 +75,15 @@ export function useSessionPlan() {
   })
 }
 
-/** Wszystko, co zmienia stan nauki, wpływa na te trzy widoki. */
+/** Wszystko, co zmienia stan nauki, wpływa na te widoki. */
 function invalidateProgress(client: QueryClient) {
   void client.invalidateQueries({ queryKey: keys.dashboard })
   void client.invalidateQueries({ queryKey: keys.phases })
   void client.invalidateQueries({ queryKey: keys.session })
   void client.invalidateQueries({ queryKey: keys.achievements })
+  // Prefiks, nie konkretne okno: dziennik bywa pobrany na 91 dni i na 30,
+  // a każde zdarzenie dopisuje się do obu.
+  void client.invalidateQueries({ queryKey: ['journal'] })
 }
 
 /**
@@ -242,5 +258,186 @@ export function useDeleteTask(phaseId: number) {
       void client.invalidateQueries({ queryKey: keys.tasks(phaseId) })
       invalidateProgress(client)
     },
+  })
+}
+
+/* ── Bank pytań ─────────────────────────────────────────────────────────────
+ * Pytania i materiały pobiera się per faza, w odróżnieniu od fiszek. Tak
+ * wygląda kontrakt (`?phase_id=`), bo jedna wspólna lista nie ma odbiorcy:
+ * pytanie bez fazy nie mówi, czego dotyczy. Widok trzyma więc wybraną fazę
+ * w stanie i to ona jest kluczem cache'u. */
+
+export function useQuestions(phaseId: number, enabled = true) {
+  return useQuery({
+    queryKey: keys.questions(phaseId),
+    queryFn: () => api.get<QuestionWithStats[]>(`/api/questions?phase_id=${phaseId}`),
+    enabled,
+  })
+}
+
+export function useUpdateQuestion(phaseId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: number
+      question_text?: string
+      answer?: string
+      question_type?: Question['question_type']
+      phase_id?: number | null
+    }) => api.patch<Question>(`/api/questions/${id}`, body),
+    onSuccess: (_data, variables) => {
+      void client.invalidateQueries({ queryKey: keys.questions(phaseId) })
+      // Przepięcie do innej fazy znika z tej listy i pojawia się w tamtej.
+      if (variables.phase_id != null && variables.phase_id !== phaseId) {
+        void client.invalidateQueries({ queryKey: keys.questions(variables.phase_id) })
+      }
+    },
+  })
+}
+
+export function useDeleteQuestion(phaseId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.del(`/api/questions/${id}`),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.questions(phaseId) })
+      invalidateProgress(client)
+    },
+  })
+}
+
+/**
+ * Podejście zapisane z banku pytań.
+ *
+ * Osobny hook od `useRecordAttempt` z sesji, i to jest cała różnica: sesja
+ * celowo nie unieważnia zapytań, żeby nie przetasować kolejki pod palcami.
+ * W bibliotece jest odwrotnie — wskaźnik samodzielności przy pytaniu ma
+ * zobaczyć podejście, które właśnie zapisałeś.
+ */
+export function useAnswerQuestion(phaseId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, solo }: { id: number; solo: boolean }) =>
+      api.post<QuestionStats>(`/api/questions/${id}/attempts`, {
+        solved_independently: solo,
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.questions(phaseId) })
+      invalidateProgress(client)
+    },
+  })
+}
+
+/* ── Materiały ───────────────────────────────────────────────────────────── */
+
+export function useResources(phaseId: number, enabled = true) {
+  return useQuery({
+    queryKey: keys.resources(phaseId),
+    queryFn: () => api.get<Resource[]>(`/api/resources?phase_id=${phaseId}`),
+    enabled,
+  })
+}
+
+export function useUpdateResource(phaseId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: number
+      title?: string
+      url?: string
+      detail?: string
+      status?: Resource['status']
+      phase_id?: number | null
+    }) => api.patch<Resource>(`/api/resources/${id}`, body),
+    onSuccess: (_data, variables) => {
+      void client.invalidateQueries({ queryKey: keys.resources(phaseId) })
+      if (variables.phase_id != null && variables.phase_id !== phaseId) {
+        void client.invalidateQueries({ queryKey: keys.resources(variables.phase_id) })
+      }
+      // Domknięcie materiału trafia do dziennika i daje XP - to już postęp.
+      if (variables.status === 'done') invalidateProgress(client)
+    },
+  })
+}
+
+export function useDeleteResource(phaseId: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => api.del(`/api/resources/${id}`),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.resources(phaseId) })
+    },
+  })
+}
+
+/* ── Dziennik ────────────────────────────────────────────────────────────── */
+
+export function useJournalDays(days: number) {
+  return useQuery({
+    queryKey: keys.journal(days),
+    queryFn: () => api.get<JournalDay[]>(`/api/journal/days?days=${days}`),
+  })
+}
+
+/** Notatka do dnia. Pusta treść kasuje notatkę - tak samo jak w backendzie. */
+export function useSaveDayNote(days: number) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ day, note }: { day: string; note: string }) =>
+      api.put<DayNote>(`/api/journal/days/${day}/note`, { note }),
+    onSuccess: (saved) => {
+      // Podmiana w cache'u zamiast unieważnienia: notatka nie zmienia niczego
+      // poza sobą, a przeładowanie kwartału przerysowałoby cały strumień.
+      client.setQueryData<JournalDay[]>(keys.journal(days), (entries) =>
+        entries?.map((entry) =>
+          entry.day === saved.day ? { ...entry, note: saved.note } : entry,
+        ),
+      )
+    },
+  })
+}
+
+/* ── Dane ────────────────────────────────────────────────────────────────── */
+
+export function useContentStatus() {
+  return useQuery({
+    queryKey: keys.content,
+    queryFn: () => api.get<ContentStatus>('/api/content/status'),
+  })
+}
+
+export function useSyncContent() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<ContentSyncResult>('/api/content/sync'),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.content })
+      void client.invalidateQueries({ queryKey: keys.flashcards })
+      void client.invalidateQueries({ queryKey: ['questions'] })
+      void client.invalidateQueries({ queryKey: ['resources'] })
+      invalidateProgress(client)
+    },
+  })
+}
+
+export function usePreviewBackup() {
+  return useMutation({
+    mutationFn: (file: File) => api.upload<BackupPreview>('/api/backup/preview', file),
+  })
+}
+
+export function useImportBackup() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) =>
+      api.upload<BackupImportResult>('/api/backup/import', file),
+    // Po podmianie całej bazy nic z cache'u nie jest już prawdą.
+    onSuccess: () => void client.invalidateQueries(),
   })
 }

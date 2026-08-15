@@ -282,6 +282,41 @@ class HeatmapDay(BaseModel):
     count: int
 
 
+class DayPhase(BaseModel):
+    """Ile zdarzeń dnia przypadło na tę fazę. None = fazy już nie da się ustalić."""
+
+    phase_id: int | None
+    count: int
+
+
+class JournalDay(BaseModel):
+    """Jeden dzień dziennika - wyliczony, nie przechowywany (poza notatką)."""
+
+    day: str
+    # Wszystkie zdarzenia dnia, łącznie z odznaczeniem zadania - to samo, co
+    # liczy heatmapa. Zero znaczy "dzień bez sesji".
+    events: int
+    reviewed: int
+    introduced: int
+    attempts: int
+    independent: int
+    tasks_done: int
+    resources_done: int
+    xp: int
+    # Od najintensywniejszej - pierwsza faza nadaje dniowi barwę.
+    phases: list[DayPhase]
+    note: str
+
+
+class DayNote(BaseModel):
+    day: str
+    note: str
+
+
+class DayNoteUpdate(BaseModel):
+    note: FreeText
+
+
 class SessionPlan(BaseModel):
     intro: list[Flashcard]
     reviews: list[Flashcard]

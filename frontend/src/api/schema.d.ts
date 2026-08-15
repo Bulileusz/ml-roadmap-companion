@@ -352,6 +352,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/journal/days": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Days */
+        get: operations["get_days_api_journal_days_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journal/days/{day}/note": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Day Note
+         * @description Notatka do dnia nauki. Pusta treść kasuje notatkę.
+         */
+        put: operations["put_day_note_api_journal_days__day__note_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/session/today": {
         parameters: {
             query?: never;
@@ -636,6 +673,28 @@ export interface components {
             streak: components["schemas"]["Streak"];
             progression: components["schemas"]["Progression"];
         };
+        /** DayNote */
+        DayNote: {
+            /** Day */
+            day: string;
+            /** Note */
+            note: string;
+        };
+        /** DayNoteUpdate */
+        DayNoteUpdate: {
+            /** Note */
+            note: string;
+        };
+        /**
+         * DayPhase
+         * @description Ile zdarzeń dnia przypadło na tę fazę. None = fazy już nie da się ustalić.
+         */
+        DayPhase: {
+            /** Phase Id */
+            phase_id: number | null;
+            /** Count */
+            count: number;
+        };
         /** Flashcard */
         Flashcard: {
             /** Id */
@@ -699,6 +758,34 @@ export interface components {
             total: number;
             /** Pct */
             pct: number;
+        };
+        /**
+         * JournalDay
+         * @description Jeden dzień dziennika - wyliczony, nie przechowywany (poza notatką).
+         */
+        JournalDay: {
+            /** Day */
+            day: string;
+            /** Events */
+            events: number;
+            /** Reviewed */
+            reviewed: number;
+            /** Introduced */
+            introduced: number;
+            /** Attempts */
+            attempts: number;
+            /** Independent */
+            independent: number;
+            /** Tasks Done */
+            tasks_done: number;
+            /** Resources Done */
+            resources_done: number;
+            /** Xp */
+            xp: number;
+            /** Phases */
+            phases: components["schemas"]["DayPhase"][];
+            /** Note */
+            note: string;
         };
         /** NextTask */
         NextTask: {
@@ -1788,6 +1875,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_days_api_journal_days_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalDay"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_day_note_api_journal_days__day__note_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayNoteUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DayNote"];
                 };
             };
             /** @description Validation Error */
