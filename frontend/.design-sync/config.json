@@ -1,6 +1,7 @@
 {
   "pkg": "ml-roadmap-frontend",
   "globalName": "MLRoadmap",
+  "projectId": "10f1a7eb-a62a-42d2-bb41-134b777e7a8b",
   "shape": "package",
   "srcDir": "src/components",
   "tsconfig": "tsconfig.json",

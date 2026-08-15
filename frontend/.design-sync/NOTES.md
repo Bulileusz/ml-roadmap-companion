@@ -1,8 +1,8 @@
 # design-sync — notatki repozytoryjne
 
 Import systemu designu z `frontend/` do claude.ai/design. Pierwszy przebieg:
-2026-08-15. **Nic jeszcze nie zostało wysłane** — nie ma `projectId` w
-`config.json`, bo pierwszy przebieg celowo zatrzymał się na buildzie lokalnym.
+2026-08-15. Cel: projekt „ML Roadmap Companion", `projectId` w `config.json`.
+Wysłano 111 plików, 17/17 komponentów zweryfikowanych.
 
 ## Rzecz najważniejsza: to jest aplikacja, nie biblioteka
 
@@ -129,5 +129,7 @@ kolejnym syncu jest więc nowe** i trzeba mu się przyjrzeć.
   `ds-bundle/_ds_bundle.css`, nie „na oko".
 - **Barwy faz są zduplikowane** w `src/lib/phases.ts` i w `conventions.md`.
   Dodanie fazy w aplikacji wymaga dopisania jej w nagłówku ręcznie.
-- **Nic nie zostało wysłane.** Przy pierwszym uploadzie obowiązuje ścieżka dla
-  pustego projektu; `projectId` trafi do `config.json` w chwili wyboru celu.
+- **Kolejny sync idzie ścieżką atomową**, bo projekt nie jest już pusty:
+  `resync.mjs --remote` z pobraną kotwicą, upload jednym przejściem na końcu.
+  Kasowania bierz dosłownie z `upload.deletePaths` w `.sync-diff.json`, nigdy
+  z ręki.
