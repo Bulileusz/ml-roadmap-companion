@@ -1,3 +1,5 @@
+import pytest
+
 from repository import questions_repo, tasks_repo
 from services import session, spaced_repetition
 
@@ -113,3 +115,32 @@ def test_session_does_not_write_anything(client, db, phase_id):
     # zrobionej pracy i nie zostawia stanu do posprzątania.
     assert db.execute("SELECT COUNT(*) FROM activity_log").fetchone()[0] == before
     assert db.execute("SELECT COUNT(*) FROM flashcards").fetchone()[0] == 1
+
+
+def test_questions_carry_their_independence_history(client, db, phase_id):
+    question_id = questions_repo.create(db, phase_id, "Czym jest bias?", "concept")
+    for solo in (True, True, False):
+        db.execute(
+            "INSERT INTO question_attempts (question_id, attempted_at, "
+            "solved_independently) VALUES (?, '2026-03-01 10:00:00', ?)",
+            (question_id, int(solo)),
+        )
+    db.commit()
+
+    plan = client.get("/api/session/today").json()
+
+    # Wskaźnik jedzie razem z pytaniem, bo sesja pokazuje go PRZED odpowiedzią:
+    # „samodzielnie 2 z 3" mówi, czy z tym pytaniem masz historię wpadek.
+    assert plan["questions"][0]["stats"] == {
+        "independent": 2,
+        "total": 3,
+        "pct": pytest.approx(66.67, abs=0.01),
+    }
+
+
+def test_untouched_question_reports_a_clean_slate(client, db, phase_id):
+    questions_repo.create(db, phase_id, "Nietknięte", "concept")
+
+    stats = client.get("/api/session/today").json()["questions"][0]["stats"]
+
+    assert stats == {"independent": 0, "total": 0, "pct": 0.0}

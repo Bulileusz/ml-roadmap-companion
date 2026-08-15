@@ -1,4 +1,4 @@
-import type { Flashcard, Question, SessionPlan } from '@/api/types'
+import type { Flashcard, QuestionWithStats, SessionPlan } from '@/api/types'
 
 import { MAX_BOX, nextBox } from './leitner'
 
@@ -22,7 +22,7 @@ import { MAX_BOX, nextBox } from './leitner'
 export type SessionStep =
   | { key: string; kind: 'intro'; card: Flashcard }
   | { key: string; kind: 'review'; card: Flashcard }
-  | { key: string; kind: 'question'; question: Question }
+  | { key: string; kind: 'question'; question: QuestionWithStats }
 
 export type SessionState = {
   queue: SessionStep[]
@@ -32,6 +32,10 @@ export type SessionState = {
   promo: { from: number; to: number } | null
   /** cardId -> aktualne pudełko, aktualizowane tylko przy pierwszym podejściu. */
   boxes: Record<number, number>
+  /** cardId -> pudełko na wejściu. Potrzebne, żeby policzyć awanse: karta
+   *  w pudełku 5 zaliczona poprawnie zostaje w piątym, więc trafienie nie
+   *  zawsze znaczy awans. */
+  initialBoxes: Record<number, number>
   /** cardId -> czy pierwsze podejście było trafione. */
   firstTry: Record<number, boolean>
   /** cardId w kolejności pierwszego ocenienia - to poszło do backendu. */
@@ -53,15 +57,18 @@ export type SessionAction =
   | { type: 'finish' }
 
 export function initSession(plan: SessionPlan): SessionState {
+  // Powtórki idą PIERWSZE, bo mają termin. Zapoznania są uznaniowe, więc gdy
+  // urwiesz sesję w połowie, ma być zrobione to, co na dziś przypadało.
+  // Pytania na końcu - wymagają złożenia kilku rzeczy naraz.
   const queue: SessionStep[] = [
-    ...plan.intro.map((card) => ({
-      key: `intro-${card.id}`,
-      kind: 'intro' as const,
-      card,
-    })),
     ...plan.reviews.map((card) => ({
       key: `review-${card.id}`,
       kind: 'review' as const,
+      card,
+    })),
+    ...plan.intro.map((card) => ({
+      key: `intro-${card.id}`,
+      kind: 'intro' as const,
       card,
     })),
     ...plan.questions.map((question) => ({
@@ -80,6 +87,7 @@ export function initSession(plan: SessionPlan): SessionState {
     revealed: false,
     promo: null,
     boxes,
+    initialBoxes: { ...boxes },
     firstTry: {},
     graded: [],
     introduced: [],
@@ -186,6 +194,34 @@ export function boxOf(state: SessionState, card: Flashcard): number {
   return state.boxes[card.id] ?? card.box
 }
 
+/**
+ * „nowa karta 2 z 5" - która to karta zapoznawcza z tych zaplanowanych na dziś.
+ *
+ * Limit nowych kart na sesję jest realną decyzją (inaczej wgranie stu fiszek
+ * z content/ dałoby sto pierwszych kontaktów w jeden wieczór), więc ma być
+ * widoczny, a nie tylko opisany.
+ */
+export function introQuota(state: SessionState, cardId: number) {
+  const intros = state.queue.filter((step) => step.kind === 'intro')
+  return {
+    index:
+      intros.findIndex((step) => step.kind === 'intro' && step.card.id === cardId) + 1,
+    total: intros.length,
+  }
+}
+
+/** „Pytanie 2 z 3" - krok pytań ma własny licznik, bo to osobny etap sesji. */
+export function questionQuota(state: SessionState, questionId: number) {
+  const questions = state.queue.filter((step) => step.kind === 'question')
+  return {
+    index:
+      questions.findIndex(
+        (step) => step.kind === 'question' && step.question.id === questionId,
+      ) + 1,
+    total: questions.length,
+  }
+}
+
 /** Stawki XP z services/gamification.py — rachunek na podsumowaniu ma się zgadzać. */
 export const XP = { review: 2, intro: 3, question: 5, solo: 3 } as const
 
@@ -197,6 +233,9 @@ export function summarize(state: SessionState) {
   const misses = state.graded.filter((id) => !state.firstTry[id])
   const solo = state.answered.filter((entry) => entry.solo).length
   const mastered = state.graded.filter((id) => state.boxes[id] === MAX_BOX).length
+  const promoted = state.graded.filter(
+    (id) => (state.boxes[id] ?? 0) > (state.initialBoxes[id] ?? 0),
+  ).length
 
   const xpReviews = reviewed * XP.review
   const xpIntros = state.introduced.length * XP.intro
@@ -212,6 +251,7 @@ export function summarize(state: SessionState) {
     answered: state.answered.length,
     solo,
     mastered,
+    promoted,
     xpReviews,
     xpIntros,
     xpQuestions,

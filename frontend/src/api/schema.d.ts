@@ -899,7 +899,7 @@ export interface components {
             /** Reviews Remaining */
             reviews_remaining: number;
             /** Questions */
-            questions: components["schemas"]["Question"][];
+            questions: components["schemas"]["QuestionWithStats"][];
             phase: components["schemas"]["Phase"] | null;
             next_task: components["schemas"]["NextTask"] | null;
             /** Total Steps */

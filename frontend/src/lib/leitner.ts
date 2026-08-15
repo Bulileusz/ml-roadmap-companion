@@ -41,3 +41,29 @@ export function promotionLabel(box: number): string {
   const target = nextBox(box, true)
   return `${whenLabel(intervalDays(target))} · pudełko ${target}`
 }
+
+/**
+ * Termin powtórki po ludzku: „dziś", „jutro", „za 4 dni", „zaległa o 3 dni".
+ *
+ * Zaległość ma własne słowo, bo „za -3 dni" jest bez sensu, a karta po
+ * terminie to inna informacja niż karta zaplanowana. Obie daty jako
+ * „RRRR-MM-DD" — porównujemy dni, nie momenty, więc strefa nie ma tu wpływu.
+ */
+export function dueLabel(nextReviewAt: string, today: string): string {
+  const days = Math.round(
+    (Date.parse(`${nextReviewAt}T00:00:00`) - Date.parse(`${today}T00:00:00`)) /
+      86_400_000,
+  )
+  if (Number.isNaN(days)) return nextReviewAt
+  if (days < 0) return `zaległa o ${-days} ${-days === 1 ? 'dzień' : 'dni'}`
+  if (days === 0) return 'dziś'
+  return whenLabel(days)
+}
+
+/** Dzisiejsza data w formacie bazy. Osobno, żeby dało się ją wstrzyknąć w teście. */
+export function todayISO(now: Date = new Date()): string {
+  // Lokalnie, nie przez toISOString(): baza liczy „dziś" czasem maszyny
+  // (services/clock.py), a UTC potrafi przesunąć dzień o jeden.
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}

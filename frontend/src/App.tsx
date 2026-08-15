@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes } from 'react-router'
 import { AppShell } from '@/components/AppShell'
 import { HotkeysProvider } from '@/lib/hotkeys'
 import { Dzis } from '@/routes/Dzis'
+import { Fiszki } from '@/routes/Fiszki'
 import { Mapa } from '@/routes/Mapa'
 import { Placeholder } from '@/routes/Placeholder'
 import { Sesja } from '@/routes/Sesja'
@@ -21,10 +22,7 @@ export function App() {
               <Route index element={<Dzis />} />
               <Route path="mapa" element={<Mapa />} />
               <Route path="sesja" element={<Sesja />} />
-              <Route
-                path="fiszki"
-                element={<Placeholder title="Fiszki" plannedIn="PR 3" />}
-              />
+              <Route path="fiszki" element={<Fiszki />} />
               <Route
                 path="pytania"
                 element={<Placeholder title="Bank pytań" plannedIn="PR 3" />}

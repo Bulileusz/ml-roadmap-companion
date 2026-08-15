@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Flashcard, Question, SessionPlan } from '@/api/types'
+import type { Flashcard, QuestionWithStats, SessionPlan } from '@/api/types'
 
 import {
   boxOf,
@@ -29,7 +29,7 @@ function card(id: number, box = 1, learned = true): Flashcard {
   }
 }
 
-function question(id: number): Question {
+function question(id: number): QuestionWithStats {
   return {
     id,
     phase_id: 1,
@@ -37,6 +37,7 @@ function question(id: number): Question {
     question_type: 'concept',
     answer: 'Odpowiedź',
     created_at: '2026-08-01 10:00:00',
+    stats: { independent: 0, total: 0, pct: 0 },
   }
 }
 
@@ -59,7 +60,7 @@ function run(state: SessionState, ...actions: SessionAction[]): SessionState {
 }
 
 describe('initSession', () => {
-  it('układa kolejkę: zapoznania, powtórki, pytania', () => {
+  it('układa kolejkę: powtórki, zapoznania, pytania', () => {
     const state = initSession(
       plan({
         intro: [card(1, 1, false)],
@@ -68,9 +69,9 @@ describe('initSession', () => {
       }),
     )
 
-    expect(state.queue.map((s) => s.kind)).toEqual(['intro', 'review', 'question'])
-    // Kolejność odbija to, jak działa nauka: najpierw pierwszy kontakt bez
-    // oceniania, potem wyciąganie z pamięci, na końcu złożone pytania.
+    // Powtórki pierwsze, bo mają termin — gdy urwiesz sesję w połowie, ma być
+    // zrobione to, co na dziś przypadało. Zapoznania są uznaniowe.
+    expect(state.queue.map((s) => s.kind)).toEqual(['review', 'intro', 'question'])
     expect(state.done).toBe(false)
   })
 
@@ -216,12 +217,13 @@ describe('podsumowanie', () => {
         questions: [question(9)],
       }),
     )
-    state = sessionReducer(state, { type: 'introduced' })
+    // Kolejka: powtórka 2, powtórka 3, zapoznanie 1, pytanie 9.
     state = run(state, { type: 'reveal' }, { type: 'grade', correct: true })
     state = sessionReducer(state, { type: 'promoEnd' })
     state = run(state, { type: 'reveal' }, { type: 'grade', correct: false })
-    // Karta 2 wróciła na koniec - przechodzimy przez pytanie do niej.
+    state = sessionReducer(state, { type: 'introduced' })
     state = sessionReducer(state, { type: 'answered', solo: true })
+    // Karta 3 wróciła na koniec kolejki.
     state = run(state, { type: 'reveal' }, { type: 'grade', correct: true })
 
     const summary = summarize(state)

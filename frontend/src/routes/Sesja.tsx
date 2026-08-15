@@ -19,8 +19,10 @@ import {
   boxOf,
   currentStep,
   initSession,
+  introQuota,
   isFirstAttempt,
   progressPct,
+  questionQuota,
   sessionReducer,
   summarize,
   type SessionState,
@@ -210,8 +212,13 @@ export function Sesja() {
   }
 
   const counter = onSummary
-    ? `${state.queue.length} / ${state.queue.length}`
-    : `${String(Math.min(state.index + 1, state.queue.length)).padStart(2, '0')} / ${state.queue.length}`
+    ? 'zamknięta'
+    : step?.kind === 'question'
+      ? (() => {
+          const { index, total } = questionQuota(state, step.question.id)
+          return `pytanie ${index} / ${total}`
+        })()
+      : `${String(Math.min(state.index + 1, state.queue.length)).padStart(2, '0')} / ${state.queue.length}`
 
   return (
     <div
@@ -275,6 +282,8 @@ export function Sesja() {
         <IntroStage
           key={step.key}
           card={step.card}
+          phaseName={plan.phase ? phaseTopic(plan.phase.name) : ''}
+          quota={introQuota(state, step.card.id)}
           onSaveNote={(note) => saveNote.mutate({ id: step.card.id, note })}
           onNext={intro}
           noteRef={noteRef}
@@ -283,6 +292,7 @@ export function Sesja() {
         <QuizStage
           key={step.key}
           question={step.question}
+          position={questionQuota(state, step.question.id)}
           onAnswer={(solo) => recordAttempt.mutate({ id: step.question.id, solo })}
           onNext={(solo) => dispatch({ type: 'answered', solo })}
         />

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Flashcard, Question, SessionPlan } from '@/api/types'
+import type { Flashcard, QuestionWithStats, SessionPlan } from '@/api/types'
 import { HotkeysProvider } from '@/lib/hotkeys'
 
 import { Sesja } from './Sesja'
@@ -14,7 +14,9 @@ vi.mock('canvas-confetti', () => ({ default: vi.fn() }))
 
 /* Test przebiegu sesji od pierwszej karty do rachunku XP. To jedyne miejsce,
  * w którym widać razem maszynę stanu, wywołania API i ekrany — a większość
- * błędów tego PR-a mieszkałaby właśnie na tych stykach. */
+ * błędów tego PR-a mieszkałaby właśnie na tych stykach.
+ *
+ * Kolejka: powtórka 2 → powtórka 3 → zapoznanie 1 → pytanie 9. */
 
 function card(id: number, over: Partial<Flashcard> = {}): Flashcard {
   return {
@@ -44,7 +46,8 @@ const PLAN: SessionPlan = {
       question_type: 'concept',
       answer: 'Przy rzadkiej klasie model odpowiadający zawsze „nie" ma 99%.',
       created_at: '2026-08-01 10:00:00',
-    } satisfies Question,
+      stats: { independent: 2, total: 3, pct: 66.67 },
+    } satisfies QuestionWithStats,
   ],
   phase: { id: 1, code: '2', name: 'Faza 2 - Klasyczne ML od zera', order_index: 2 },
   next_task: {
@@ -76,7 +79,7 @@ function stubFetch() {
     }
     if (url.endsWith('/api/session/today')) return json(PLAN)
     if (url.includes('/review') || url.includes('/intro')) return json(card(2))
-    if (url.includes('/attempts')) return json({ independent: 1, total: 1, pct: 100 })
+    if (url.includes('/attempts')) return json({ independent: 3, total: 4, pct: 75 })
     if (method === 'PATCH') return json(card(1))
     return json({})
   })
@@ -98,9 +101,24 @@ function renderSesja() {
   )
 }
 
-/** Przeklikuje kartę zapoznawczą, żeby dojść do powtórek. */
+/** Odsłania i ocenia bieżącą powtórkę. Po trafieniu leci takt awansu. */
+async function gradeCard(correct: boolean) {
+  await userEvent.keyboard(' ')
+  await userEvent.keyboard(correct ? '2' : '1')
+}
+
+/** Przechodzi obie powtórki na „umiałem", żeby dojść do zapoznania. */
+async function passReviews() {
+  for (const front of ['Co robi parametr k?', 'Przód 3']) {
+    await screen.findByText(front, {}, { timeout: 3000 })
+    await gradeCard(true)
+  }
+}
+
+/** Zapoznanie i pytanie — reszta drogi do podsumowania. */
 async function passIntro() {
-  await userEvent.click(await screen.findByRole('button', { name: /rozumiem, dalej/i }))
+  await screen.findByText('Czym jest gradient?', {}, { timeout: 3000 })
+  await userEvent.click(screen.getByRole('button', { name: /rozumiem, dalej/i }))
 }
 
 beforeEach(() => {
@@ -113,41 +131,19 @@ afterEach(() => {
 })
 
 describe('Sesja', () => {
-  it('zaczyna od karty zapoznawczej, bez oceniania', async () => {
+  it('zaczyna od powtórki, bo ta ma termin', async () => {
     renderSesja()
 
-    expect(await screen.findByText('Czym jest gradient?')).toBeInTheDocument()
-    expect(screen.getByText(/bez oceniania/i)).toBeInTheDocument()
-    // Pierwszy kontakt z materiałem nie jest testem — nie ma czego oceniać.
-    expect(screen.queryByRole('button', { name: /nie umiałem/i })).toBeNull()
-    expect(screen.getByText('Nowa')).toBeInTheDocument()
-  })
-
-  it('zapisuje notatkę własnymi słowami razem z zapoznaniem', async () => {
-    renderSesja()
-    await screen.findByText('Czym jest gradient?')
-
-    await userEvent.type(screen.getByLabelText(/moimi słowami/i), 'wektor pochodnych')
-    await passIntro()
-
-    await waitFor(() => expect(calls.length).toBeGreaterThanOrEqual(2))
-    expect(calls).toEqual(
-      expect.arrayContaining([
-        {
-          method: 'PATCH',
-          url: '/api/flashcards/1',
-          body: { own_note: 'wektor pochodnych' },
-        },
-        { method: 'POST', url: '/api/flashcards/1/intro', body: null },
-      ]),
-    )
+    // Zapoznania są uznaniowe — gdy urwiesz sesję w połowie, ma być zrobione
+    // to, co na dziś przypadało.
+    expect(await screen.findByText('Co robi parametr k?')).toBeInTheDocument()
+    expect(screen.queryByText('Czym jest gradient?')).toBeNull()
+    expect(screen.getByText('Pudełko 2')).toBeInTheDocument()
   })
 
   it('odsłania odpowiedź spacją i pokazuje prawdziwy interwał na przycisku', async () => {
     renderSesja()
-    await passIntro()
-
-    expect(await screen.findByText('Co robi parametr k?')).toBeInTheDocument()
+    await screen.findByText('Co robi parametr k?')
     expect(screen.queryByText('Tył 2')).toBeNull()
 
     await userEvent.keyboard(' ')
@@ -160,11 +156,9 @@ describe('Sesja', () => {
 
   it('trafienie zapisuje powtórkę i pokazuje takt awansu pudełka', async () => {
     renderSesja()
-    await passIntro()
     await screen.findByText('Co robi parametr k?')
-    await userEvent.keyboard(' ')
 
-    await userEvent.keyboard('2')
+    await gradeCard(true)
 
     expect(calls.filter((c) => c.url === '/api/flashcards/2/review')).toEqual([
       { method: 'POST', url: '/api/flashcards/2/review', body: { correct: true } },
@@ -174,27 +168,103 @@ describe('Sesja', () => {
     expect(screen.getByText('wraca za 4 dni')).toBeInTheDocument()
   })
 
-  it('wpadka wraca w tej sesji, ale drugie podejście nie idzie do backendu', async () => {
+  it('zapoznanie przychodzi po powtórkach, bez oceniania i z jawną ceną', async () => {
     renderSesja()
+    await passReviews()
+
+    expect(
+      await screen.findByText('Czym jest gradient?', {}, { timeout: 3000 }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/bez oceniania/i)).toBeInTheDocument()
+    // Pierwszy kontakt z materiałem nie jest testem — nie ma czego oceniać.
+    expect(screen.queryByRole('button', { name: /nie umiałem/i })).toBeNull()
+    // Stopka mówi, co zrobi przycisk, zanim go naciśniesz.
+    expect(
+      screen.getByText('Wejdzie do pudełka 1 · powtórka jutro'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('+3 XP')).toBeInTheDocument()
+    expect(screen.getByText('nowa karta 1 z 1')).toBeInTheDocument()
+  })
+
+  it('zapisuje notatkę własnymi słowami razem z zapoznaniem', async () => {
+    renderSesja()
+    await passReviews()
+    await screen.findByText('Czym jest gradient?', {}, { timeout: 3000 })
+
+    await userEvent.type(screen.getByLabelText(/moimi słowami/i), 'wektor pochodnych')
+    await userEvent.click(screen.getByRole('button', { name: /rozumiem, dalej/i }))
+
+    await waitFor(() =>
+      expect(calls).toEqual(
+        expect.arrayContaining([
+          {
+            method: 'PATCH',
+            url: '/api/flashcards/1',
+            body: { own_note: 'wektor pochodnych' },
+          },
+          { method: 'POST', url: '/api/flashcards/1/intro', body: null },
+        ]),
+      ),
+    )
+  })
+
+  it('krok pytań pokazuje historię samodzielności przed odpowiedzią', async () => {
+    renderSesja()
+    await passReviews()
     await passIntro()
-    await screen.findByText('Co robi parametr k?')
-    await userEvent.keyboard(' ')
-    await userEvent.keyboard('1')
 
-    // Karta 3, potem pytanie, potem wraca karta 2.
-    await screen.findByText('Przód 3')
-    await userEvent.keyboard(' ')
-    await userEvent.keyboard('2')
+    expect(
+      await screen.findByText('Dlaczego accuracy bywa myląca?'),
+    ).toBeInTheDocument()
+    // Ta liczba mówi, czy to pytanie regularnie Cię przewraca.
+    expect(screen.getByText('samodzielnie 2 z 3')).toBeInTheDocument()
+    expect(screen.getByText('Koncept')).toBeInTheDocument()
+    expect(screen.getByText('Pytanie 1 / 1')).toBeInTheDocument()
+    // Odpowiedź jest zakryta, dopóki nie zadeklarujesz, jak poszło.
+    expect(screen.queryByText(/Przy rzadkiej klasie/)).toBeNull()
+  })
 
-    await screen.findByText('Dlaczego accuracy bywa myląca?', {}, { timeout: 3000 })
+  it('odpowiedź samodzielna przelicza wskaźnik i odsłania wzorzec', async () => {
+    renderSesja()
+    await passReviews()
+    await passIntro()
+    await screen.findByText('Dlaczego accuracy bywa myląca?')
+
     await userEvent.click(
       screen.getByRole('button', { name: /rozwiązałem samodzielnie/i }),
     )
-    await userEvent.click(await screen.findByRole('button', { name: /^dalej$/i }))
+
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        {
+          method: 'POST',
+          url: '/api/questions/9/attempts',
+          body: { solved_independently: true },
+        },
+      ]),
+    )
+    // 2 z 3 plus to podejście = 3 z 4, czyli 75%.
+    expect(await screen.findByText('75%')).toBeInTheDocument()
+    expect(screen.getByText('samodzielnie 3 z 4')).toBeInTheDocument()
+    expect(screen.getByText('+8 XP')).toBeInTheDocument()
+    expect(screen.getByText(/Przy rzadkiej klasie/)).toBeInTheDocument()
+  })
+
+  it('wpadka wraca w tej sesji, ale drugie podejście nie idzie do backendu', async () => {
+    renderSesja()
+    await screen.findByText('Co robi parametr k?')
+    await gradeCard(false)
+
+    // Kolejka: powtórka 3, zapoznanie, pytanie, potem wraca powtórka 2.
+    await screen.findByText('Przód 3')
+    await gradeCard(true)
+    await passIntro()
+    await screen.findByText('Dlaczego accuracy bywa myląca?')
+    await userEvent.click(screen.getByRole('button', { name: /musiałem sprawdzić/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /zamknij sesję/i }))
 
     expect(await screen.findByText('Co robi parametr k?')).toBeInTheDocument()
-    await userEvent.keyboard(' ')
-    await userEvent.keyboard('2')
+    await gradeCard(true)
 
     // Odpowiedź widziałeś minutę temu — to ćwiczenie, nie powtórka.
     expect(calls.filter((c) => c.url === '/api/flashcards/2/review')).toHaveLength(1)
@@ -202,19 +272,13 @@ describe('Sesja', () => {
 
   it('kończy rachunkiem XP liczonym stawkami backendu', async () => {
     renderSesja()
+    await passReviews()
     await passIntro()
-
-    // Obie karty na „umiałem", pytanie samodzielnie.
-    for (const front of ['Co robi parametr k?', 'Przód 3']) {
-      await screen.findByText(front, {}, { timeout: 3000 })
-      await userEvent.keyboard(' ')
-      await userEvent.keyboard('2')
-    }
-    await screen.findByText('Dlaczego accuracy bywa myląca?', {}, { timeout: 3000 })
+    await screen.findByText('Dlaczego accuracy bywa myląca?')
     await userEvent.click(
       screen.getByRole('button', { name: /rozwiązałem samodzielnie/i }),
     )
-    await userEvent.click(await screen.findByRole('button', { name: /^dalej$/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /zamknij sesję/i }))
 
     expect(await screen.findByText('Sesja zakończona')).toBeInTheDocument()
     // 2 powtórki x2 + 1 zapoznanie x3 + 1 pytanie x5 + premia x3 = 15
@@ -223,20 +287,21 @@ describe('Sesja', () => {
     expect(screen.getByText('1 × 5')).toBeInTheDocument()
     // „1 × 3" pojawia się dwa razy: nowe karty i premia za samodzielność.
     expect(screen.getAllByText('1 × 3')).toHaveLength(2)
-    // Wiersz notatek stoi na zero i to jest uczciwa informacja, nie błąd.
-    expect(screen.getByText('Notatki')).toBeInTheDocument()
-    // Karta 3 była w pudełku 4, więc trafienie doprowadziło ją do piątego.
-    expect(screen.getByText('w pudełku 5')).toBeInTheDocument()
+    // Obie karty awansowały: 2→3 i 4→5.
+    expect(screen.getByText('awansów pudełka')).toBeInTheDocument()
+    expect(screen.getByText('1/1')).toBeInTheDocument()
   })
 
   it('Esc kończy sesję w dowolnym momencie', async () => {
     renderSesja()
-    await screen.findByText('Czym jest gradient?')
+    await screen.findByText('Co robi parametr k?')
 
     await userEvent.keyboard('{Escape}')
 
     expect(await screen.findByText('Sesja zakończona')).toBeInTheDocument()
-    // Nic nie zostało ocenione, więc nie ma za co naliczać punktów.
-    expect(screen.getByText(/nie ma za co naliczyć/i)).toBeInTheDocument()
+    // Nic nie zostało ocenione — rachunek stoi na zerach, ale wiersze zostają
+    // na ekranie, bo „0 × 2" to informacja, a nie brak danych.
+    expect(screen.getByText('0 × 2')).toBeInTheDocument()
+    expect(screen.getByLabelText('Zdobyte 0 XP')).toBeInTheDocument()
   })
 })
