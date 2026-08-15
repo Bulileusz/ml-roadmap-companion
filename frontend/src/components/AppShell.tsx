@@ -1,12 +1,11 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
 import { HotkeyCheatsheet } from '@/components/HotkeyCheatsheet'
 import { Kbd } from '@/components/ui/primitives'
 import { cn } from '@/lib/cn'
 import { useHotkeys } from '@/lib/hotkeys-context'
-import { pageTransition } from '@/lib/motion'
 import { NAV } from '@/lib/nav'
 
 export function AppShell() {
@@ -25,7 +24,7 @@ export function AppShell() {
       keys: 's',
       description: 'Zacznij sesję dnia',
       group: 'Akcje',
-      handler: () => void navigate('/session'),
+      handler: () => void navigate('/sesja'),
     },
     {
       keys: '?',
@@ -36,13 +35,20 @@ export function AppShell() {
   ])
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[13rem_1fr]">
-      <Sidebar />
-      <main className="min-w-0 px-4 py-6 md:px-8 md:py-10">
-        {/* mode="wait" zamiast równoległych wyjść: dwie strony jednocześnie
-            w tym samym gridzie skakałyby wysokością przy każdej zmianie trasy. */}
+    <div className="flex min-h-dvh flex-col md:flex-row">
+      <Rail />
+      {/* Trasy same decydują o swoim układzie: strony treści biorą wąską
+          kolumnę przez <Page>, a sesja wypełnia wysokość własnym flexem. */}
+      <main className="flex min-w-0 flex-1 flex-col">
         <AnimatePresence mode="wait">
-          <motion.div key={location.pathname} {...pageTransition}>
+          <motion.div
+            key={location.pathname}
+            className="flex min-h-0 flex-1 flex-col"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          >
             <Outlet />
           </motion.div>
         </AnimatePresence>
@@ -52,45 +58,55 @@ export function AppShell() {
   )
 }
 
-function Sidebar() {
+/**
+ * Standardowa kolumna treści: 720 px na środku.
+ *
+ * Jedna wąska kolumna zamiast siatki paneli to główna decyzja tego motywu —
+ * długość wiersza zostaje czytelna, a hierarchię niesie typografia i włosowe
+ * kreski, nie ramki.
+ */
+export function Page({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex-1 overflow-auto px-6 py-10 md:px-12 md:py-14">
+      <div className="mx-auto w-full max-w-[45rem]">{children}</div>
+    </div>
+  )
+}
+
+function Rail() {
   return (
     <nav
       className={cn(
-        'bg-canvas/80 border-line sticky top-0 z-20 backdrop-blur',
-        'flex gap-1 overflow-x-auto border-b px-3 py-2',
-        'md:h-dvh md:flex-col md:gap-0.5 md:overflow-visible md:border-r md:border-b-0 md:px-3 md:py-6',
+        'bg-canvas/90 border-line sticky top-0 z-20 flex shrink-0 gap-1 overflow-x-auto border-b px-3 py-2 backdrop-blur',
+        'md:h-dvh md:w-24 md:flex-col md:gap-0.5 md:overflow-visible md:border-r md:border-b-0 md:px-0 md:py-7',
       )}
     >
-      <div className="hidden px-2 pb-6 md:block">
-        <p className="font-display text-ink text-sm font-extrabold tracking-tight">
-          ML Roadmap
-        </p>
-        <p className="text-ink-faint text-xs">towarzysz codziennej nauki</p>
-      </div>
+      <span className="font-display text-ink-faint hidden pb-6 pl-5 text-xs font-extrabold tracking-[0.12em] uppercase md:block">
+        ML
+      </span>
 
-      {NAV.map(({ to, label, icon: Icon, chord }) => (
+      {NAV.map(({ to, label, chord }) => (
         <NavLink
           key={to}
           to={to}
           end={to === '/'}
+          title={`g ${chord}`}
           className={({ isActive }) =>
             cn(
-              'rounded-control group flex shrink-0 items-center gap-2.5 px-3 py-2 text-sm transition',
+              'shrink-0 border-l-2 px-3 py-2 text-xs tracking-[0.02em] transition-colors md:px-0 md:pr-2 md:pl-[18px] md:text-[0.78rem]',
               isActive
-                ? 'bg-raised text-ink font-medium'
-                : 'text-ink-muted hover:text-ink hover:bg-surface',
+                ? 'text-ink border-[var(--phase,var(--color-info))]'
+                : 'text-ink-faint hover:text-ink border-transparent',
             )
           }
         >
-          <Icon size={17} strokeWidth={2} />
-          <span>{label}</span>
-          {/* Podpowiedź skrótu tylko na szerokim ekranie i tylko przy hoverze:
-              ma się przypomnieć, a nie zaśmiecać nawigację na stałe. */}
-          <span className="ml-auto hidden opacity-0 transition-opacity group-hover:opacity-100 md:block">
-            <Kbd>g {chord}</Kbd>
-          </span>
+          {label}
         </NavLink>
       ))}
+
+      <span className="ml-auto flex items-center pr-1 md:mt-auto md:ml-0 md:pl-[18px]">
+        <Kbd>?</Kbd>
+      </span>
     </nav>
   )
 }

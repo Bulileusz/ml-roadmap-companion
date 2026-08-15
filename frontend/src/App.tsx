@@ -3,8 +3,10 @@ import { BrowserRouter, Route, Routes } from 'react-router'
 
 import { AppShell } from '@/components/AppShell'
 import { HotkeysProvider } from '@/lib/hotkeys'
-import { Dashboard } from '@/routes/Dashboard'
+import { Dzis } from '@/routes/Dzis'
+import { Mapa } from '@/routes/Mapa'
 import { Placeholder } from '@/routes/Placeholder'
+import { Sesja } from '@/routes/Sesja'
 
 export function App() {
   return (
@@ -16,29 +18,27 @@ export function App() {
         <HotkeysProvider>
           <Routes>
             <Route element={<AppShell />}>
-              <Route index element={<Dashboard />} />
+              <Route index element={<Dzis />} />
+              <Route path="mapa" element={<Mapa />} />
+              <Route path="sesja" element={<Sesja />} />
               <Route
-                path="session"
-                element={<Placeholder title="Sesja dnia" plannedIn="PR 2" />}
+                path="fiszki"
+                element={<Placeholder title="Fiszki" plannedIn="PR 3" />}
               />
               <Route
-                path="flashcards"
-                element={<Placeholder title="Fiszki" plannedIn="PR 2" />}
-              />
-              <Route
-                path="questions"
+                path="pytania"
                 element={<Placeholder title="Bank pytań" plannedIn="PR 3" />}
               />
               <Route
-                path="resources"
-                element={<Placeholder title="Zasoby" plannedIn="PR 3" />}
+                path="zasoby"
+                element={<Placeholder title="Zasoby" plannedIn="PR 4" />}
               />
               <Route
-                path="journal"
+                path="dziennik"
                 element={<Placeholder title="Dziennik nauki" plannedIn="PR 4" />}
               />
               <Route
-                path="data"
+                path="dane"
                 element={<Placeholder title="Dane" plannedIn="PR 4" />}
               />
               <Route

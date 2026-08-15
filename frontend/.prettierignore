@@ -1,0 +1,6 @@
+dist
+node_modules
+# Plik generowany przez `make api-types`. Sformatowanie go rozjeżdża go
+# z tym, co wypluwa openapi-typescript, a CI porównuje oba bajt w bajt.
+src/api/schema.d.ts
+openapi.json
