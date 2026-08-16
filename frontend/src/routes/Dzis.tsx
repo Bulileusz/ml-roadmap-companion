@@ -1,7 +1,13 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 
-import { usePhaseTasks, usePhases, useDashboard, useSessionPlan } from '@/api/queries'
+import {
+  useAchievements,
+  usePhaseTasks,
+  usePhases,
+  useDashboard,
+  useSessionPlan,
+} from '@/api/queries'
 import type { Dashboard, SessionPlan } from '@/api/types'
 import { Page } from '@/components/AppShell'
 import { StreakFlame } from '@/components/Progression'
@@ -169,6 +175,9 @@ function Teraz({ plan }: { plan: SessionPlan | undefined }) {
 
 function Poziom({ data }: { data: Dashboard }) {
   const { progression } = data
+  const achievements = useAchievements()
+  const zdobyte = achievements.data?.filter((item) => item.unlocked).length
+
   return (
     <section className="flex items-center gap-4 pt-8">
       <span className="text-ink-faint text-[0.72rem] tracking-[0.02em]">
@@ -186,6 +195,16 @@ function Poziom({ data }: { data: Dashboard }) {
         <AnimatedNumber value={progression.xp_into_level} /> /{' '}
         {progression.xp_for_next_level} XP
       </span>
+      {/* Dorobek nie dostaje własnego ekranu — tylko tę jedną liczbę, i to
+          w linii, która i tak już tu była. Pełna lista siedzi w Dzienniku. */}
+      {achievements.data ? (
+        <Link
+          to="/dziennik"
+          className="text-ink-faint hover:text-ink tabular shrink-0 text-[0.72rem] transition-colors"
+        >
+          {zdobyte} z {achievements.data.length} odznak
+        </Link>
+      ) : null}
     </section>
   )
 }
