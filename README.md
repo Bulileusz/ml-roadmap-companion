@@ -33,8 +33,8 @@ make lint       # ruff, tsc, eslint
 ## Moduły
 
 - **Roadmapa** — postęp przez fazy (0, 1, 2, 2b, 3, 4): edytowalne zadania,
-  notatki, pierścienie postępu. Każda faza ma własną barwę, która wraca potem
-  wszędzie, gdzie o niej mowa.
+  notatki, oś postępu. Każda faza ma własną barwę, która wraca potem wszędzie,
+  gdzie o niej mowa.
 - **Fiszki** — spaced repetition Leitnera (5 pudełek, interwały 1/2/4/7/14 dni).
 - **Bank pytań** — pytania koncepcyjne i kodowe per faza, z odpowiedzią do
   odsłonięcia, pełnym logiem podejść i skumulowanym wskaźnikiem samodzielności.
@@ -48,11 +48,16 @@ make lint       # ruff, tsc, eslint
 
 ## Sesja dnia
 
-Plan układa się sam: do 5 fiszek zapoznawczych → do 20 powtórek → 3 pytania
-z fazy, w której faktycznie jesteś → następne zadanie roadmapy jako drogowskaz.
-Kolejność odbija to, jak działa nauka: najpierw pierwszy kontakt z materiałem
-bez oceniania, potem wyciąganie z pamięci, na końcu pytania wymagające złożenia
-kilku rzeczy razem.
+Plan układa się sam: do 20 powtórek → do 5 fiszek zapoznawczych → 3 pytania
+z fazy, w której faktycznie jesteś. Następne zadanie roadmapy dochodzi na
+podsumowaniu, jako drogowskaz na jutro.
+
+Kolejność wynika z tego, co jest zobowiązaniem: **powtórki idą pierwsze, bo mają
+termin**. Zapoznania są uznaniowe, więc sesja urwana w połowie ma mieć zrobione to,
+co na dziś przypadało. Pytania na końcu, bo wymagają złożenia kilku rzeczy naraz
+i są najdroższe poznawczo. Kolejność etapów układa front
+(`lib/session-machine.ts`) — backend zwraca trzy listy, bo to decyzja o przebiegu,
+nie o danych.
 
 Plan jest **wyliczany, nie zapisywany** (`GET /api/session/today`). Każdy krok
 odkłada się osobnym endpointem, więc sesja przerwana w połowie nie gubi zrobionej
@@ -189,11 +194,27 @@ szybciej niż migracje, więc ich miejsce jest przy kodzie, w `repository/`.
 
 ## Warstwa designu
 
-Motyw jest ciemny i „premium edu": near-black płótno z lekkim przesunięciem
-w niebiesko-fiolet, hojne promienie, warstwowa głębia. Kolor ma **znaczyć** —
-każda faza roadmapy ma własną barwę, która wraca na pierścieniu postępu, lewej
-krawędzi karty, badge'u i washu pod kartą. Płótno zostaje neutralne, żeby treść
-i postęp były jedynymi rzeczami, które świecą.
+Motyw nazywa się **„oś"**: jedna wąska kolumna treści (720 px, `<Page>`
+w `AppShell`) obok pionowej szyny nawigacji, oś czasu zamiast siatki kafelków,
+hierarchia niesiona typografią i włosowymi kreskami zamiast ramek i cieni.
+Ekran pytania w sesji to gołe płótno z dużym stopniem pisma. Płótno jest ciemne
+i neutralne — near-black z lekkim przesunięciem w niebiesko-fiolet — żeby treść
+i postęp były jedynymi rzeczami, które świecą. Kolor ma **znaczyć**: każda faza
+roadmapy ma własną barwę, która wraca jako krawędź, kropka i akcent wszędzie,
+gdzie o tej fazie mowa.
+
+To **drugi** kierunek. Pierwszy — „premium edu" z siatką kart, cieniami,
+pierścieniami postępu i gradientami — powstał w PR #3 i został świadomie
+zastąpiony w PR #5, zanim doszły cztery kolejne moduły. Jeśli natkniesz się na
+„premium edu" w historii repo albo w starszych notatkach, to wersja nieaktualna.
+Z pierwszego kierunku zostały: barwa przypisana do fazy, ciemne płótno, płomień
+serii, takt awansu pudełka i racjonowane confetti. Odpadły: siatka kart,
+pierścienie postępu na ekranach, obrót 3D fiszki. `Card` przetrwał, ale jako
+pojedyncza powierzchnia (dialog ściągawki, wyróżniony blok) — nie jako sposób
+układania strony.
+
+Budując nowy ekran, patrz na `Fiszki` i `Mapę`: gęsta lista, kreska zamiast
+ramki, kolor fazy jako lewa krawędź albo kropka.
 
 Wszystkie tokeny siedzą w `frontend/src/styles/theme.css` (`@theme` Tailwinda) —
 jedno miejsce, w odróżnieniu od wersji streamlitowej, gdzie wygląd był

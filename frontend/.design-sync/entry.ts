@@ -9,7 +9,6 @@
 // Kolejność bez znaczenia; brak eksportów domyślnych, więc nazwy nie kolidują.
 
 export * from '@/components/ui/primitives'
-export * from '@/components/ui/ProgressRing'
 export * from '@/components/Progression'
 export * from '@/components/HotkeyCheatsheet'
 export * from '@/components/AppShell'

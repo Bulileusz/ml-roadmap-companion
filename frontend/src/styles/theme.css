@@ -7,9 +7,15 @@
  * była nieusuwalna. Tutaj wszystko jest w jednym miejscu, bo Tailwind v4 czyta
  * tokeny wprost z CSS-a.
  *
- * Motyw: ciemny, „premium edu". Kolor ma znaczyć - każda faza roadmapy ma własną
- * barwę i to ona nosi tożsamość ekranu. Płótno zostaje neutralne i ciemne, żeby
- * treść i postęp były jedynymi rzeczami, które świecą.
+ * Motyw: ciemny, kierunek „oś" - wąska kolumna treści, hierarchia na typografii
+ * i włosowych kreskach zamiast ramek i siatki kart. Kolor ma znaczyć: każda faza
+ * roadmapy ma własną barwę i to ona nosi tożsamość ekranu. Płótno zostaje
+ * neutralne i ciemne, żeby treść i postęp były jedynymi rzeczami, które świecą.
+ *
+ * Poprzedni kierunek („premium edu": siatka kart, cienie, pierścienie postępu)
+ * został zastąpiony w PR #5. Tokeny głębi zostały, bo dalej niosą pojedyncze
+ * powierzchnie - dialog, wyróżniony blok - ale nie są już sposobem układania
+ * strony. Szczegóły w README, sekcja „Warstwa designu".
  */
 
 @theme {
@@ -21,7 +27,6 @@
   --color-canvas: #0b0d12;
   --color-surface: #12151c;
   --color-raised: #181c25;
-  --color-overlay: #1e2330;
   --color-line: oklch(1 0 0 / 7%);
   --color-line-strong: oklch(1 0 0 / 12%);
 
@@ -63,10 +68,10 @@
   --shadow-lift:
     0 1px 0 0 oklch(1 0 0 / 7%) inset, 0 2px 4px 0 oklch(0 0 0 / 40%),
     0 16px 40px -16px oklch(0 0 0 / 60%);
-
-  /* --- Ruch --------------------------------------------------------------- */
-  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+/* Ruchu nie ma w tokenach: idzie na sprężynach z lib/motion.ts, nie na krzywych
+ * czasowych, więc krzywa easingu nie miałaby czego opisywać. */
 
 /* Palety faz siedzą w lib/phases.ts, nie tutaj: kody faz pochodzą z bazy
  * i można je zmienić w aplikacji, więc klasa Tailwinda per faza rozsypałaby się
@@ -85,7 +90,7 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Liczby w kafelkach i pierścieniach nie mają skakać w poziomie przy każdym
+  /* Liczby w licznikach i na paskach nie mają skakać w poziomie przy każdym
    * przeliczeniu - domyślne cyfry proporcjonalne mają różne szerokości. */
   .tabular {
     font-variant-numeric: tabular-nums;
