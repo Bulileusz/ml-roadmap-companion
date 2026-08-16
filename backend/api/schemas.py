@@ -33,9 +33,7 @@ FreeText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=20
 
 QuestionType = Literal["concept", "code"]
 ResourceStatus = Literal["todo", "in_progress", "done"]
-ResourceKind = Literal[
-    "book", "course", "video", "docs", "article", "dataset", "other"
-]
+ResourceKind = Literal["book", "course", "video", "docs", "article", "dataset", "other"]
 
 
 def _assert_matches(name: str, literal: object, source: tuple[str, ...]) -> None:

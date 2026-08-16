@@ -54,3 +54,10 @@ https://docs.pytorch.org/docs/stable/notes/randomness.html
 `torch.manual_seed`, `use_deterministic_algorithms` i seed workerów DataLoadera.
 Bez tego dwa uruchomienia tego samego kodu dają różne wyniki i nie da się
 powiedzieć, czy pomogła zmiana modelu, czy losowanie.
+
+## [docs] torchvision: datasets i transforms
+https://docs.pytorch.org/vision/stable/transforms.html
+`datasets.CIFAR10(root=..., download=True)`, `ToTensor`, `Normalize` i składanie
+przez `Compose`. „Dive into Deep Learning" pobiera obrazy własnymi funkcjami
+z pakietu `d2l`, więc bez tej strony zadanie o CNN wisi na kodzie z książki,
+którego nie przeniesiesz na własne zdjęcia betonu w następnej fazie.

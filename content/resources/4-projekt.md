@@ -82,6 +82,18 @@ Około 9 160 obrazów, ujednolicony benchmark segmentacji rys (Harvard Dataverse
 wersja V4). Punkt odniesienia: pozwala porównać własny model z literaturą,
 zamiast zgadywać, czy IoU 0,7 to dobrze, czy słabo.
 
+## [docs] scikit-learn: metryki klasyfikacji
+https://scikit-learn.org/stable/modules/model_evaluation.html#classification-metrics
+`precision_recall_curve`, `average_precision_score`, `classification_report`.
+Ta sama strona co w Fazie 2, ale tutaj jest codziennym narzędziem: przy zbiorze
+w proporcji 8:1 połowa tej fazy stoi na czytaniu tych trzech rzeczy poprawnie.
+
+## [docs] Metryki segmentacji: IoU i Dice
+https://docs.pytorch.org/torcheval/stable/
+Przy segmentacji łatwo policzyć IoU źle i tego nie zauważyć — uśrednione po
+pikselach zamiast po klasach wygląda świetnie na zbiorze, gdzie 98% obrazu to
+tło. Licz per klasa i raportuj obie liczby osobno.
+
 ## [article] Deep Learning for Crack Detection — przegląd
 https://arxiv.org/abs/2508.10256
 Przegląd z 2025: paradygmaty uczenia, generalizacja i zbiory w wykrywaniu rys.
