@@ -9,6 +9,7 @@ from repository import (
     phases_repo,
     questions_repo,
     resources_repo,
+    tasks_repo,
 )
 from services import clock, spaced_repetition
 
@@ -37,13 +38,19 @@ class SyncResult:
     flashcards_added: int = 0
     questions_added: int = 0
     resources_added: int = 0
+    tasks_added: int = 0
     answers_filled: int = 0
     skipped: int = 0
     warnings: list[str] = field(default_factory=list)
 
     @property
     def total_added(self) -> int:
-        return self.flashcards_added + self.questions_added + self.resources_added
+        return (
+            self.flashcards_added
+            + self.questions_added
+            + self.resources_added
+            + self.tasks_added
+        )
 
 
 def normalize_key(phase_code: str, text: str) -> str:
@@ -234,6 +241,54 @@ def _sync_resources(
             result.resources_added += 1
 
 
+def _sync_tasks(
+    conn: sqlite3.Connection, root: Path, phase_ids: dict[str, int], result: SyncResult
+) -> None:
+    """Zadania roadmapy z content/tasks/ - nagłówek to tytuł, treść pod nim to notatka.
+
+    Roadmapa była do tej pory jedyną treścią spoza content/: siedziała w
+    seed_data.SEED_TASKS i wjeżdżała wyłącznie na pustą bazę, więc rozdrobnienie
+    jej wymagało grzebania w bazie ręcznie. Tutaj wchodzi w ten sam tryb, co
+    reszta treści - addytywnie, po kluczu, bez wskrzeszania skasowanych.
+
+    Notatka jest ważniejsza niż przy pozostałych rodzajach: to w niej siedzi
+    "co zrobić" i "Gotowe, gdy", czyli jedyne zdanie mówiące, czy wieczór się
+    udał. Zadanie bez notatki wjedzie, ale jest ostrzegane - pusty tytuł na
+    ekranie odprawy nie ma czego pokazać.
+    """
+    seen = content_imports_repo.imported_keys(conn, content_imports_repo.KIND_TASK)
+
+    for path in _markdown_files(root / "tasks"):
+        code = phase_code_from_filename(path)
+        if code not in phase_ids:
+            result.warnings.append(
+                f"{path.name}: nieznany kod fazy '{code}' - pomijam."
+            )
+            continue
+
+        for title, notes in parse_sections(path.read_text(encoding="utf-8")):
+            if not title:
+                continue
+
+            key = normalize_key(code, title)
+            if key in seen:
+                result.skipped += 1
+                continue
+
+            if not notes:
+                result.warnings.append(
+                    f"{path.name}: zadanie '{title[:40]}' bez opisu - "
+                    f"wjeżdża, ale odprawa nie ma czego pokazać."
+                )
+
+            tasks_repo.create(conn, phase_ids[code], title, notes)
+            content_imports_repo.mark_imported(
+                conn, content_imports_repo.KIND_TASK, key
+            )
+            seen.add(key)
+            result.tasks_added += 1
+
+
 def sync(
     conn: sqlite3.Connection, root: Path | None = None, today: date | None = None
 ) -> SyncResult:
@@ -254,6 +309,10 @@ def sync(
         result.warnings.append("Brak faz w bazie - import materiałów pominięty.")
         return result
 
+    # Zadania pierwsze: to one wyznaczają fazę, w której jesteś, a od niej zależy
+    # dobór pytań do sesji. Kolejność w obrębie jednego przebiegu nic nie zmienia,
+    # ale przy pierwszym starcie na pustej bazie porządkuje logi.
+    _sync_tasks(conn, root, phase_ids, result)
     _sync_flashcards(conn, root, phase_ids, result, today or clock.today())
     _sync_questions(conn, root, phase_ids, result)
     _sync_resources(conn, root, phase_ids, result)
@@ -268,6 +327,7 @@ _IMPORT_KIND_TO_GROUP = {
     content_imports_repo.KIND_FLASHCARD: "flashcards",
     content_imports_repo.KIND_QUESTION: "questions",
     content_imports_repo.KIND_RESOURCE: "resources",
+    content_imports_repo.KIND_TASK: "tasks",
 }
 
 
@@ -284,11 +344,11 @@ def imported_counts(conn: sqlite3.Connection) -> dict[str, int]:
 def available_counts(root: Path | None = None) -> dict[str, int]:
     """Ile pozycji leży w plikach - do pokazania obok liczby zaimportowanych."""
     root = root or CONTENT_ROOT
-    counts = {"flashcards": 0, "questions": 0, "resources": 0}
+    counts = {"flashcards": 0, "questions": 0, "resources": 0, "tasks": 0}
     if not root.is_dir():
         return counts
 
-    for kind in ("flashcards", "questions", "resources"):
+    for kind in ("flashcards", "questions", "resources", "tasks"):
         for path in _markdown_files(root / kind):
             counts[kind] += len(parse_sections(path.read_text(encoding="utf-8")))
     return counts

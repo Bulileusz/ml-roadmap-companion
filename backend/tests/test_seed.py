@@ -1,4 +1,4 @@
-from db.seed_data import SEED_PHASES, SEED_TASKS, seed_if_empty
+from db.seed_data import SEED_PHASES, seed_if_empty
 
 
 def _counts(conn):
@@ -7,12 +7,24 @@ def _counts(conn):
     return phases, tasks
 
 
-def test_seed_populates_phases_and_tasks(conn):
+def test_seed_populates_phases(conn):
     seed_if_empty(conn)
 
-    phases, tasks = _counts(conn)
+    phases, _ = _counts(conn)
     assert phases == len(SEED_PHASES)
-    assert tasks == sum(len(titles) for titles in SEED_TASKS.values())
+
+
+def test_seed_creates_no_tasks(conn):
+    """Roadmapa wchodzi z content/tasks/, nie z seeda.
+
+    Wcześniej zadania jechały tędy i przez to wjeżdżały wyłącznie na pustą bazę -
+    zmiana roadmapy na bazie, której się używa, wymagała ręcznego SQL-a. Fazy
+    zostają, bo są szkieletem, do którego import przypina resztę treści.
+    """
+    seed_if_empty(conn)
+
+    _, tasks = _counts(conn)
+    assert tasks == 0
 
 
 def test_seed_is_idempotent(conn):

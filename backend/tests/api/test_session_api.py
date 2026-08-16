@@ -14,7 +14,7 @@ def test_empty_session_on_a_freshly_seeded_database(client, seeded):
     # Zero kroków to zero minut, nie "minuta na rozkręcenie się".
     assert plan["estimated_minutes"] == 0
     assert plan["phase"]["code"] == "0"
-    assert plan["next_task"]["title"].startswith("NumPy")
+    assert plan["next_task"]["title"] == "Postaw środowisko"
 
 
 def test_session_orders_the_day_intro_reviews_questions(client, db, phase_id):

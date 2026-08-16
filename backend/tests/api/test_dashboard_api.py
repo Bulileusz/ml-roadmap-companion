@@ -6,14 +6,15 @@ def test_dashboard_on_a_freshly_seeded_database(client, seeded):
     data = client.get("/api/dashboard").json()
 
     assert data["roadmap"]["done"] == 0
-    assert data["roadmap"]["total"] == 26
+    # Roadmapa fixture'u `seeded`, nie seeda - zadania wchodzą z content/tasks/.
+    assert data["roadmap"]["total"] == 12
     assert data["due_count"] == 0
     assert data["intro_count"] == 0
     assert data["independence"] == {"independent": 0, "total": 0, "pct": 0.0}
     assert data["streak"] == {"current": 0, "longest": 0, "active_days": 0}
     assert data["progression"]["level"] == 1
     # Pierwsze niedokończone zadanie z pierwszej fazy - to jest "co dziś robię".
-    assert data["next_task"]["title"].startswith("NumPy")
+    assert data["next_task"]["title"] == "Postaw środowisko"
     assert data["next_task"]["phase_name"].startswith("Faza 0")
 
 

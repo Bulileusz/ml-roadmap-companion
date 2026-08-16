@@ -36,3 +36,21 @@ dobre uzupełnienie oficjalnych tutoriali.
 https://pytorch.org/tutorials/beginner/basics/data_tutorial.html
 Batche, tasowanie i wczytywanie własnych danych. Potrzebne, zanim wejdziesz
 w Fazę 4 z własnym zbiorem.
+
+## [book] Dive into Deep Learning: rozdział o CNN
+https://d2l.ai/chapter_convolutional-neural-networks/index.html
+Konwolucja, padding, stride, pooling, receptive field i kanały — z kodem do
+uruchomienia. To brakujący pomost między MLP z tej fazy a transfer learningiem
+z Fazy 4: bez niego dostrajanie gotowej sieci jest kopiowaniem cudzego kodu.
+
+## [docs] PyTorch: Automatic Mixed Precision (torch.amp)
+https://docs.pytorch.org/docs/stable/amp.html
+`autocast` i `GradScaler` pozwalają liczyć w FP16/BF16 na Tensor Cores. Przy
+12 GB VRAM podwaja to mieszczalny batch — a przy zdjęciach betonu w 512–768 px
+pamięć kończy się szybciej, niż się spodziewasz.
+
+## [docs] PyTorch: Reproducibility
+https://docs.pytorch.org/docs/stable/notes/randomness.html
+`torch.manual_seed`, `use_deterministic_algorithms` i seed workerów DataLoadera.
+Bez tego dwa uruchomienia tego samego kodu dają różne wyniki i nie da się
+powiedzieć, czy pomogła zmiana modelu, czy losowanie.

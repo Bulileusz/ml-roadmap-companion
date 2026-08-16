@@ -8,7 +8,8 @@ from services import clock
 KIND_FLASHCARD = "flashcard"
 KIND_QUESTION = "question"
 KIND_RESOURCE = "resource"
-KINDS = (KIND_FLASHCARD, KIND_QUESTION, KIND_RESOURCE)
+KIND_TASK = "task"
+KINDS = (KIND_FLASHCARD, KIND_QUESTION, KIND_RESOURCE, KIND_TASK)
 
 
 def imported_keys(conn: sqlite3.Connection, kind: str) -> set[str]:

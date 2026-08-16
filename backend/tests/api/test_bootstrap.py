@@ -23,7 +23,10 @@ def test_bootstrap_migrates_seeds_and_imports_content(monkeypatch, tmp_path):
     conn = get_connection(db_path)
     try:
         assert conn.execute("SELECT COUNT(*) FROM phases").fetchone()[0] == 6
-        assert conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 26
+        # Zadania wjeżdżają z content/tasks/, nie z seeda - dlatego liczba jest
+        # tu warunkiem "cokolwiek wjechało", a nie stałą do przepisywania przy
+        # każdym rozpisaniu kolejnej fazy roadmapy.
+        assert conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] > 0
         # content/ z repo wjeżdża przy starcie, więc fiszka dopisana do pliku
         # trafia do bazy bez dodatkowego kliknięcia.
         assert conn.execute("SELECT COUNT(*) FROM flashcards").fetchone()[0] > 0

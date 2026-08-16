@@ -641,6 +641,8 @@ export interface components {
             questions_added: number;
             /** Resources Added */
             resources_added: number;
+            /** Tasks Added */
+            tasks_added: number;
             /** Answers Filled */
             answers_filled: number;
             /** Skipped */
@@ -952,7 +954,7 @@ export interface components {
              * @default other
              * @enum {string}
              */
-            kind: "book" | "course" | "video" | "docs" | "article" | "other";
+            kind: "book" | "course" | "video" | "docs" | "article" | "dataset" | "other";
             /**
              * Detail
              * @default

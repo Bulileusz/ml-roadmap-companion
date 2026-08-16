@@ -23,7 +23,7 @@ def test_list_tasks_of_a_phase(client, phase_id):
 
     assert response.status_code == 200
     tasks = response.json()
-    assert tasks[0]["title"].startswith("NumPy")
+    assert tasks[0]["title"] == "Postaw środowisko"
     assert tasks[0]["is_done"] is False
 
 

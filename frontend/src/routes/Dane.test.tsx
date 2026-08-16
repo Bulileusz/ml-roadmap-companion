@@ -9,11 +9,12 @@ import type { BackupPreview } from '@/api/types'
 import { Dane } from './Dane'
 
 const STATUS = {
-  available: { flashcards: 80, questions: 31, resources: 18 },
-  imported: { flashcards: 76, questions: 31, resources: 18 },
+  available: { tasks: 20, flashcards: 80, questions: 31, resources: 18 },
+  imported: { tasks: 20, flashcards: 76, questions: 31, resources: 18 },
 }
 
 const SYNC = {
+  tasks_added: 0,
   flashcards_added: 4,
   questions_added: 0,
   resources_added: 0,

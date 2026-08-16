@@ -328,4 +328,5 @@ def test_available_counts_reads_files_without_touching_db(content_root):
         "flashcards": 2,
         "questions": 3,
         "resources": 1,
+        "tasks": 0,
     }

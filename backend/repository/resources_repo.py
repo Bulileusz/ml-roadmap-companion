@@ -10,7 +10,10 @@ STATUSES = (STATUS_TODO, STATUS_IN_PROGRESS, STATUS_DONE)
 # Rodzaje materiału. Bez CHECK w schemacie - lista rośnie szybciej niż
 # migracje, a wpisanie nieznanego rodzaju ma degradować UI do ikony
 # domyślnej, a nie wywalać zapis.
-KINDS = ("book", "course", "video", "docs", "article", "other")
+# "dataset" doszedł z fazą projektową: zbiór danych nie jest ani dokumentacją,
+# ani artykułem - z materiału do przeczytania robi się materiał do pobrania,
+# a to inna decyzja („czy mam miejsce na dysku") i inny sposób odhaczenia.
+KINDS = ("book", "course", "video", "docs", "article", "dataset", "other")
 DEFAULT_KIND = "other"
 
 
