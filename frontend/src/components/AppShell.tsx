@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
+import { CommandPalette } from '@/components/CommandPalette'
 import { HotkeyCheatsheet } from '@/components/HotkeyCheatsheet'
 import { UnlockToast } from '@/components/UnlockToast'
 import { Kbd } from '@/components/ui/primitives'
@@ -13,6 +14,7 @@ export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const [cheatsheetOpen, setCheatsheetOpen] = useState(false)
+  const [paletteOpen, setPaletteOpen] = useState(false)
 
   useHotkeys([
     ...NAV.map((item) => ({
@@ -28,6 +30,15 @@ export function AppShell() {
       handler: () => void navigate('/sesja'),
     },
     {
+      keys: 'mod+k',
+      description: 'Paleta poleceń',
+      group: 'Akcje',
+      // Także w polu tekstowym: paleta jest wyjściem awaryjnym z każdego
+      // miejsca, więc nie może dać się zablokować kursorem w szukajce.
+      allowWhileTyping: true,
+      handler: () => setPaletteOpen((open) => !open),
+    },
+    {
       keys: '?',
       description: 'Ta ściągawka',
       group: 'Akcje',
@@ -37,10 +48,19 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
+      {/* Pierwszy element w kolejności tabulacji: bez niego klawiatura wchodzi
+          w treść dopiero po przejściu przez całą szynę nawigacji, a przy
+          siedmiu pozycjach to siedem tabów na każdym ekranie. */}
+      <a
+        href="#tresc"
+        className="bg-surface border-line-strong text-ink rounded-control sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:border focus:px-4 focus:py-2 focus:text-sm"
+      >
+        Przejdź do treści
+      </a>
       <Rail onHelp={() => setCheatsheetOpen(true)} />
       {/* Trasy same decydują o swoim układzie: strony treści biorą wąską
           kolumnę przez <Page>, a sesja wypełnia wysokość własnym flexem. */}
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main id="tresc" tabIndex={-1} className="flex min-w-0 flex-1 flex-col">
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
@@ -54,6 +74,11 @@ export function AppShell() {
           </motion.div>
         </AnimatePresence>
       </main>
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        onShowHelp={() => setCheatsheetOpen(true)}
+      />
       <HotkeyCheatsheet open={cheatsheetOpen} onOpenChange={setCheatsheetOpen} />
       {/* W powłoce, nie na ekranie sesji: domknięcie fazy przychodzi
           z odhaczenia zadania na Mapie, a nie z powtórki. */}
