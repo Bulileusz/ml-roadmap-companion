@@ -66,11 +66,11 @@ function json(payload: unknown): Response {
   return { ok: true, status: 200, json: async () => payload } as Response
 }
 
-function renderFiszki() {
+function renderFiszki(entry = '/fiszki') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[entry]}>
         <HotkeysProvider>
           <Fiszki />
         </HotkeysProvider>
@@ -229,6 +229,16 @@ describe('Biblioteka fiszek', () => {
 
     // null znaczy „odepnij"; pominięcie pola znaczyłoby „nie dotykaj".
     await waitFor(() => expect(calls[0]?.body).toMatchObject({ phase_id: null }))
+  })
+
+  it('wejście z palety zawęża listę i otwiera wskazaną fiszkę', async () => {
+    renderFiszki('/fiszki?q=lasy&karta=3')
+
+    // Zapytanie ląduje w szukajce, więc karta jest na górze, a nie pod
+    // pięćdziesiątym wierszem.
+    expect(await screen.findByDisplayValue('lasy')).toBeInTheDocument()
+    expect(screen.queryByText('Czym jest gradient?')).toBeNull()
+    await waitFor(() => expect(screen.getByDisplayValue('Tył 3')).toBeInTheDocument())
   })
 
   it('otwarcie drugiej fiszki zamyka pierwszą', async () => {

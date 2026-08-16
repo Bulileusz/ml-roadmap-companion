@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useSearchParams } from 'react-router'
 
 import {
   useDeleteFlashcard,
@@ -30,10 +31,17 @@ import { matches } from '@/lib/search'
 export function Fiszki() {
   const cards = useFlashcards()
   const phases = usePhases()
-  const [query, setQuery] = useState('')
+  const [params] = useSearchParams()
+  // Wejście z palety poleceń: `?q=` zawęża listę, `?karta=` otwiera pozycję.
+  // Czytane raz, przy montażu — o powtórne wejście z nowymi parametrami dba
+  // `FiszkiRoute` poniżej, remontując widok.
+  const [query, setQuery] = useState(() => params.get('q') ?? '')
   const [phaseFilter, setPhaseFilter] = useState<number | 'all'>('all')
   const [boxFilter, setBoxFilter] = useState<number | 'all' | 'intro'>('all')
-  const [openId, setOpenId] = useState<number | null>(null)
+  const [openId, setOpenId] = useState<number | null>(() => {
+    const id = Number(params.get('karta'))
+    return id > 0 ? id : null
+  })
   const searchRef = useRef<HTMLInputElement>(null)
 
   useHotkeys([
@@ -473,4 +481,17 @@ function Editor({
       </div>
     </motion.div>
   )
+}
+
+/**
+ * Trasa `/fiszki` — biblioteka przeklucowana parametrami z URL-a.
+ *
+ * Paleta poleceń potrafi tu wejść, gdy już na tej stronie jesteś, a wtedy
+ * komponent się nie montuje i inicjalizatory stanu nie mają jak zadziałać.
+ * Klucz z parametrów remontuje widok, więc `?q=` i `?karta=` czyta się raz,
+ * przy montażu — bez efektu przepisującego adres do stanu.
+ */
+export function FiszkiRoute() {
+  const [params] = useSearchParams()
+  return <Fiszki key={params.toString()} />
 }

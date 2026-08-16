@@ -6,7 +6,7 @@ import { HotkeysProvider } from '@/lib/hotkeys'
 import { Dane } from '@/routes/Dane'
 import { Dziennik } from '@/routes/Dziennik'
 import { Dzis } from '@/routes/Dzis'
-import { Fiszki } from '@/routes/Fiszki'
+import { FiszkiRoute } from '@/routes/Fiszki'
 import { Mapa } from '@/routes/Mapa'
 import { NieZnaleziono } from '@/routes/NieZnaleziono'
 import { Pytania } from '@/routes/Pytania'
@@ -26,7 +26,7 @@ export function App() {
               <Route index element={<Dzis />} />
               <Route path="mapa" element={<Mapa />} />
               <Route path="sesja" element={<Sesja />} />
-              <Route path="fiszki" element={<Fiszki />} />
+              <Route path="fiszki" element={<FiszkiRoute />} />
               <Route path="pytania" element={<Pytania />} />
               <Route path="zasoby" element={<Zasoby />} />
               <Route path="dziennik" element={<Dziennik />} />

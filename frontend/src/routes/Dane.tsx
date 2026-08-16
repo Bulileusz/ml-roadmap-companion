@@ -141,6 +141,9 @@ function Tresc() {
 
       {result ? (
         <motion.div
+          // Wynik pojawia się bez zmiany focusu, więc bez `status` przepadłby
+          // dla kogoś, kto nie patrzy na ekran.
+          role="status"
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
@@ -269,6 +272,7 @@ function Kopia() {
 
         {load.data ? (
           <motion.div
+            role="status"
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}

@@ -311,12 +311,22 @@ function Calendar({
             <span
               key={entry.day}
               title={`${DATE_SHORT.format(parseDay(entry.day))} — bez sesji`}
+              // Dzień bez sesji nie jest klikalny i nic nie wnosi do odczytu
+              // na głos — sto pustych pól to sto razy „bez sesji".
+              aria-hidden
               className="bg-line size-[11px] rounded-[2px]"
             />
           ) : (
             <button
               key={entry.day}
               onClick={() => onSelect(entry.day)}
+              // `title` jest podpowiedzią myszy, nie nazwą dostępną — czytnik
+              // ekranu nie ma obowiązku go przeczytać, więc obie muszą być.
+              aria-label={`${DATE_SHORT.format(parseDay(entry.day))} — ${counted(
+                entry.reviewed,
+                REVIEWS,
+              )}, +${entry.xp} XP`}
+              aria-pressed={selected === entry.day}
               title={`${DATE_SHORT.format(parseDay(entry.day))} — ${counted(
                 entry.reviewed,
                 REVIEWS,
