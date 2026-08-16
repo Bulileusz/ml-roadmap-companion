@@ -11,12 +11,17 @@ import math
 import sqlite3
 from datetime import date
 
-from repository import phases_repo, questions_repo, tasks_repo
+from repository import phases_repo, questions_repo, resources_repo, tasks_repo
 from services import clock, progress, spaced_repetition
 
 # Limity jednej sesji. Kolejka zapoznawcza przejęła rolę dawnego
 # NEW_CARDS_PER_DAY: wgranie stu fiszek z content/ nie ma dać stu nowych kart
 # do przerobienia w jeden wieczór.
+# Ile materiałów pokazać na odprawie. Trzy mieszczą się pod zadaniem jednym
+# rzutem oka; przy pięciu robi się lista do przewijania, a wtedy jesteś na
+# ekranie Zasobów, nie w sesji.
+MATERIALS_PER_BRIEFING = 3
+
 INTROS_PER_SESSION = 5
 # Powtórki nie znikają, jeśli nie zmieszczą się w sesji - zaległe zostają
 # zaległe. Sufit jest po to, żeby licznik postępu na górze ekranu miał
@@ -32,6 +37,11 @@ SECONDS_PER_INTRO = 20
 SECONDS_PER_REVIEW = 15
 SECONDS_PER_QUESTION = 90
 SESSION_OVERHEAD_SECONDS = 60
+# Odprawa to przeczytanie, co dziś robisz - nie sama robota. Zadanie roadmapy
+# zajmie wieczór, ale dzieje się poza aplikacją, więc doliczanie go tutaj
+# wyrzuciłoby szacunek sesji z czterech minut na sześćdziesiąt cztery
+# i zniechęcało dokładnie tak, jak opisuje komentarz przy sufcie powtórek.
+SECONDS_PER_BRIEFING = 45
 
 
 def current_phase(conn: sqlite3.Connection) -> sqlite3.Row | None:
@@ -48,15 +58,46 @@ def current_phase(conn: sqlite3.Connection) -> sqlite3.Row | None:
     return phases[-1] if phases else None
 
 
-def estimate_seconds(intro: int, reviews: int, questions: int) -> int:
-    if intro + reviews + questions == 0:
+def estimate_seconds(
+    intro: int, reviews: int, questions: int, briefing: int = 0
+) -> int:
+    if intro + reviews + questions + briefing == 0:
         return 0
     return (
         intro * SECONDS_PER_INTRO
         + reviews * SECONDS_PER_REVIEW
         + questions * SECONDS_PER_QUESTION
+        + briefing * SECONDS_PER_BRIEFING
         + SESSION_OVERHEAD_SECONDS
     )
+
+
+def briefing(conn: sqlite3.Connection) -> dict | None:
+    """Odprawa: co dziś robisz, z czego i który to punkt fazy.
+
+    Zadanie roadmapy zajmuje wieczór, a sesja kilkanaście minut - te dwie rzeczy
+    nie mieszczą się w jednym przebiegu. Dlatego to jest **zapowiedź, nie praca**:
+    ekran mówi, co masz dziś zrobić, i schodzi z drogi. Odhaczenie następuje na
+    Mapie, po faktycznej robocie, więc ten krok niczego nie zapisuje.
+
+    Materiały są przypisem, nie połową ekranu: łączy je z zadaniem tylko faza,
+    więc lista mówi uczciwie "to są źródła tej fazy", zamiast twierdzić, że
+    dana pozycja jest materiałem do tego konkretnego zadania.
+    """
+    task = tasks_repo.first_incomplete(conn)
+    if task is None:
+        return None
+
+    phase_id = task["phase_id"]
+    done, total = tasks_repo.count_progress(conn, phase_id)
+    return {
+        "task": task,
+        "materials": resources_repo.list_for_session(
+            conn, phase_id, MATERIALS_PER_BRIEFING
+        ),
+        "done": done,
+        "total": total,
+    }
 
 
 def plan(conn: sqlite3.Connection, today: date | None = None) -> dict:
@@ -84,8 +125,12 @@ def plan(conn: sqlite3.Connection, today: date | None = None) -> dict:
         else []
     )
 
-    seconds = estimate_seconds(len(intro), len(reviews), len(questions))
+    brief = briefing(conn)
+    seconds = estimate_seconds(
+        len(intro), len(reviews), len(questions), 1 if brief else 0
+    )
     return {
+        "briefing": brief,
         "intro": intro,
         "reviews": reviews,
         # Ile powtórek nie weszło do tej sesji. Pokazywane obok licznika, żeby
@@ -94,6 +139,6 @@ def plan(conn: sqlite3.Connection, today: date | None = None) -> dict:
         "questions": questions,
         "phase": phase,
         "next_task": tasks_repo.first_incomplete(conn),
-        "total_steps": len(intro) + len(reviews) + len(questions),
+        "total_steps": len(intro) + len(reviews) + len(questions) + (1 if brief else 0),
         "estimated_minutes": math.ceil(seconds / 60),
     }

@@ -248,6 +248,10 @@ class NextTask(BaseModel):
     phase_id: int
     title: str
     phase_name: str
+    # "Co zrobić" i "Gotowe, gdy" - jedyne zdanie, które mówi, czy wieczór się
+    # udał. Kolumna jedzie w wierszu z `first_incomplete` od zawsze; do PR-a
+    # z odprawą odcinał ją tylko response_model.
+    notes: str
 
 
 class BoxCount(BaseModel):
@@ -317,7 +321,24 @@ class DayNoteUpdate(BaseModel):
     note: FreeText
 
 
+class Briefing(BaseModel):
+    """Pierwszy krok sesji: co dziś robisz, z czego i który to punkt fazy.
+
+    Jeden zagnieżdżony obiekt zamiast trzech luźnych pól, bo front podejmuje
+    jedną decyzję ("jest odprawa albo jej nie ma") zamiast korelować zadanie
+    z listą materiałów i licznikiem.
+    """
+
+    task: NextTask
+    materials: list[Resource]
+    done: int
+    total: int
+
+
 class SessionPlan(BaseModel):
+    # None, gdy cała roadmapa jest odhaczona - wtedy sesja zaczyna się od
+    # powtórek, tak jak przed tym PR-em.
+    briefing: Briefing | None
     intro: list[Flashcard]
     reviews: list[Flashcard]
     reviews_remaining: int

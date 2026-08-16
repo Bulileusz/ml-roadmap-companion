@@ -48,15 +48,23 @@ make lint       # ruff, tsc, eslint
 
 ## Sesja dnia
 
-Plan układa się sam: do 20 powtórek → do 5 fiszek zapoznawczych → 3 pytania
-z fazy, w której faktycznie jesteś. Następne zadanie roadmapy dochodzi na
-podsumowaniu, jako drogowskaz na jutro.
+Plan układa się sam: **odprawa** → do 20 powtórek → do 5 fiszek zapoznawczych →
+3 pytania z fazy, w której faktycznie jesteś.
 
-Kolejność wynika z tego, co jest zobowiązaniem: **powtórki idą pierwsze, bo mają
-termin**. Zapoznania są uznaniowe, więc sesja urwana w połowie ma mieć zrobione to,
-co na dziś przypadało. Pytania na końcu, bo wymagają złożenia kilku rzeczy naraz
-i są najdroższe poznawczo. Kolejność etapów układa front
-(`lib/session-machine.ts`) — backend zwraca trzy listy, bo to decyzja o przebiegu,
+**Odprawa** otwiera wieczór jednym ekranem: co dziś robisz (następne niezrobione
+zadanie roadmapy razem z jego opisem i warunkiem „Gotowe, gdy"), z czego (do trzech
+nieprzerobionych materiałów tej fazy) i który to punkt fazy. Jest **zapowiedzią,
+nie pracą** — zadanie roadmapy zajmuje wieczór, a sesja kilkanaście minut, więc te
+dwie rzeczy nie mieszczą się w jednym przebiegu. Ekran niczego nie zapisuje;
+zadanie odhaczasz na Mapie, po faktycznej robocie. Materiały są przypisem, nie
+tematem: łączy je z zadaniem sama faza, więc lista mówi „to są źródła tej fazy",
+zamiast twierdzić, że dana pozycja jest materiałem do tego zadania.
+
+Dalsza kolejność wynika z tego, co jest zobowiązaniem: **powtórki idą przed
+zapoznaniami, bo mają termin**. Zapoznania są uznaniowe, więc sesja urwana
+w połowie ma mieć zrobione to, co na dziś przypadało. Pytania na końcu, bo wymagają
+złożenia kilku rzeczy naraz i są najdroższe poznawczo. Kolejność etapów układa front
+(`lib/session-machine.ts`) — backend zwraca listy, bo to decyzja o przebiegu,
 nie o danych.
 
 Plan jest **wyliczany, nie zapisywany** (`GET /api/session/today`). Każdy krok

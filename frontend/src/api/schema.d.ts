@@ -622,6 +622,23 @@ export interface components {
             /** Count */
             count: number;
         };
+        /**
+         * Briefing
+         * @description Pierwszy krok sesji: co dziś robisz, z czego i który to punkt fazy.
+         *
+         *     Jeden zagnieżdżony obiekt zamiast trzech luźnych pól, bo front podejmuje
+         *     jedną decyzję ("jest odprawa albo jej nie ma") zamiast korelować zadanie
+         *     z listą materiałów i licznikiem.
+         */
+        Briefing: {
+            task: components["schemas"]["NextTask"];
+            /** Materials */
+            materials: components["schemas"]["Resource"][];
+            /** Done */
+            done: number;
+            /** Total */
+            total: number;
+        };
         /** ContentStatus */
         ContentStatus: {
             /** Available */
@@ -799,6 +816,8 @@ export interface components {
             title: string;
             /** Phase Name */
             phase_name: string;
+            /** Notes */
+            notes: string;
         };
         /** Phase */
         Phase: {
@@ -981,6 +1000,7 @@ export interface components {
         };
         /** SessionPlan */
         SessionPlan: {
+            briefing: components["schemas"]["Briefing"] | null;
             /** Intro */
             intro: components["schemas"]["Flashcard"][];
             /** Reviews */

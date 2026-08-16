@@ -10,7 +10,12 @@ import {
   useSessionPlan,
 } from '@/api/queries'
 import { Summary } from '@/components/session/Summary'
-import { IntroStage, QuizStage, ReviewStage } from '@/components/session/stages'
+import {
+  BriefingStage,
+  IntroStage,
+  QuizStage,
+  ReviewStage,
+} from '@/components/session/stages'
 import { Badge, Kbd, Skeleton } from '@/components/ui/primitives'
 import { celebrate, celebrateBig } from '@/lib/confetti'
 import { useHotkeys } from '@/lib/hotkeys-context'
@@ -32,6 +37,7 @@ import {
 const PROMO_MS = 950
 
 const EMPTY: SessionState = initSession({
+  briefing: null,
   intro: [],
   reviews: [],
   reviews_remaining: 0,
@@ -122,7 +128,9 @@ export function Sesja() {
     setDrillStarted(true)
     dispatchDrill({
       type: 'init',
-      plan: { ...plan, intro: [], questions: [], reviews: missed },
+      // briefing wyzerowany jawnie: spread przepuściłby go z planu i przebieg
+      // poprawkowy zaczynałby się od drugiej odprawy tego samego zadania.
+      plan: { ...plan, briefing: null, intro: [], questions: [], reviews: missed },
     })
   }
 
@@ -164,7 +172,9 @@ export function Sesja() {
       description: 'Dalej',
       group: 'Sesja',
       handler: () => {
-        if (step?.kind === 'review' && !state.revealed) dispatch({ type: 'reveal' })
+        if (step?.kind === 'briefing') dispatch({ type: 'briefed' })
+        else if (step?.kind === 'review' && !state.revealed)
+          dispatch({ type: 'reveal' })
         else if (onSummary) void navigate('/')
       },
     },
@@ -267,6 +277,12 @@ export function Sesja() {
           summary={summary}
           plan={plan}
           onRedo={summary.misses.length > 0 ? redo : null}
+        />
+      ) : step?.kind === 'briefing' ? (
+        <BriefingStage
+          key={step.key}
+          briefing={step.briefing}
+          onNext={() => dispatch({ type: 'briefed' })}
         />
       ) : step?.kind === 'review' ? (
         <ReviewStage

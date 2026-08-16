@@ -50,11 +50,16 @@ const PLAN: SessionPlan = {
     } satisfies QuestionWithStats,
   ],
   phase: { id: 1, code: '2', name: 'Faza 2 - Klasyczne ML od zera', order_index: 2 },
+  // Bez odprawy: ten opis sprawdza kolejność powtórek, zapoznań i pytań, więc
+  // brief przed nimi przesunąłby każdy krok i wysadził liczniki. Odprawa ma
+  // własny describe niżej.
+  briefing: null,
   next_task: {
     id: 7,
     phase_id: 1,
     title: 'Granice decyzyjne',
     phase_name: 'Faza 2 - Klasyczne ML od zera',
+    notes: 'Porównaj KNN, LogReg, drzewo i SVM.',
   },
   total_steps: 4,
   estimated_minutes: 4,
@@ -66,7 +71,7 @@ function json(payload: unknown): Response {
   return { ok: true, status: 200, json: async () => payload } as Response
 }
 
-function stubFetch() {
+function stubFetch(planPayload: SessionPlan = PLAN) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input)
     const method = init?.method ?? 'GET'
@@ -77,7 +82,7 @@ function stubFetch() {
         body: init?.body ? JSON.parse(String(init.body)) : null,
       })
     }
-    if (url.endsWith('/api/session/today')) return json(PLAN)
+    if (url.endsWith('/api/session/today')) return json(planPayload)
     if (url.includes('/review') || url.includes('/intro')) return json(card(2))
     if (url.includes('/attempts')) return json({ independent: 3, total: 4, pct: 75 })
     if (method === 'PATCH') return json(card(1))
@@ -303,5 +308,78 @@ describe('Sesja', () => {
     // na ekranie, bo „0 × 2" to informacja, a nie brak danych.
     expect(screen.getByText('0 × 2')).toBeInTheDocument()
     expect(screen.getByLabelText('Zdobyte 0 XP')).toBeInTheDocument()
+  })
+})
+
+describe('Odprawa', () => {
+  const PLAN_Z_ODPRAWA: SessionPlan = {
+    ...PLAN,
+    briefing: {
+      task: {
+        id: 7,
+        phase_id: 1,
+        title: 'Granice decyzyjne',
+        phase_name: 'Faza 2 - Klasyczne ML od zera',
+        notes:
+          'Porównaj KNN, LogReg, drzewo i SVM na jednym zbiorze.\nGotowe, gdy masz jeden wykres z czterema granicami.',
+      },
+      materials: [
+        {
+          id: 3,
+          phase_id: 1,
+          title: 'scikit-learn: porównanie klasyfikatorów',
+          url: 'https://scikit-learn.org/stable/auto_examples/classification.html',
+          kind: 'article',
+          detail: '',
+          status: 'todo',
+          order_index: 0,
+        },
+      ],
+      done: 2,
+      total: 6,
+    },
+    intro: [],
+    reviews: [],
+    questions: [],
+    total_steps: 1,
+  }
+
+  beforeEach(() => {
+    calls = []
+    vi.stubGlobal('fetch', stubFetch(PLAN_Z_ODPRAWA))
+  })
+
+  it('otwiera sesję zadaniem, jego opisem i materiałem', async () => {
+    renderSesja()
+
+    expect(await screen.findByText('Granice decyzyjne')).toBeInTheDocument()
+    expect(screen.getByText(/Gotowe, gdy masz jeden wykres/)).toBeInTheDocument()
+    expect(
+      screen.getByText('scikit-learn: porównanie klasyfikatorów'),
+    ).toBeInTheDocument()
+    // Licznik mówi, który to punkt fazy, a stopka — że nic się tu nie odhacza.
+    expect(screen.getByText('zadanie 3 z 6')).toBeInTheDocument()
+    expect(screen.getByText(/Odhaczysz na Mapie/)).toBeInTheDocument()
+  })
+
+  it('nie wysyła ani jednego żądania zapisu', async () => {
+    renderSesja()
+    await screen.findByText('Granice decyzyjne')
+
+    await userEvent.click(screen.getByRole('button', { name: /wiem, co robić/i }))
+
+    // Cała umowa tego ekranu: zapowiada, nie odhacza. Zadanie roadmapy
+    // zamykasz na Mapie, po faktycznej robocie.
+    expect(calls).toEqual([])
+  })
+
+  it('Enter przechodzi dalej', async () => {
+    renderSesja()
+    await screen.findByText('Granice decyzyjne')
+
+    await userEvent.keyboard('{Enter}')
+
+    expect(await screen.findByText('Sesja zakończona')).toBeInTheDocument()
+    expect(calls).toEqual([])
   })
 })

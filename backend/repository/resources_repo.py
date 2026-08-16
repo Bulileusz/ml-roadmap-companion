@@ -24,6 +24,30 @@ def list_by_phase(conn: sqlite3.Connection, phase_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def list_for_session(
+    conn: sqlite3.Connection, phase_id: int, limit: int
+) -> list[sqlite3.Row]:
+    """Materiały na odprawę: z czego uczyć się dziś w tej fazie.
+
+    Zaczęte przed nietkniętymi - materiał raz otwarty ma zostać domknięty,
+    zanim otworzysz trzecią książkę. To jedyny sygnał ciągłości, jaki ta tabela
+    niesie. Dalej kolejność z pliku (`order_index`), bo w content/resources
+    jest ona zamierzoną kolejnością czytania: NumPy basics przed
+    broadcastingiem. Losowanie regularnie stawiałoby referencję `torch.nn`
+    przed "Learn the Basics".
+
+    Przerobione odpadają w SQL, nie na froncie: sesja pyta "z czego mam się dziś
+    uczyć", a nie "co jest w fazie".
+    """
+    return conn.execute(
+        "SELECT * FROM resources "
+        "WHERE phase_id = ? AND status != ? "
+        "ORDER BY CASE status WHEN ? THEN 0 ELSE 1 END, order_index, id "
+        "LIMIT ?",
+        (phase_id, STATUS_DONE, STATUS_IN_PROGRESS, limit),
+    ).fetchall()
+
+
 def get(conn: sqlite3.Connection, resource_id: int) -> sqlite3.Row | None:
     return conn.execute(
         "SELECT * FROM resources WHERE id = ?", (resource_id,)

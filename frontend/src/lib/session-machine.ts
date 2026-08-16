@@ -1,4 +1,4 @@
-import type { Flashcard, QuestionWithStats, SessionPlan } from '@/api/types'
+import type { Briefing, Flashcard, QuestionWithStats, SessionPlan } from '@/api/types'
 
 import { MAX_BOX, nextBox } from './leitner'
 
@@ -20,6 +20,7 @@ import { MAX_BOX, nextBox } from './leitner'
  */
 
 export type SessionStep =
+  | { key: string; kind: 'briefing'; briefing: Briefing }
   | { key: string; kind: 'intro'; card: Flashcard }
   | { key: string; kind: 'review'; card: Flashcard }
   | { key: string; kind: 'question'; question: QuestionWithStats }
@@ -49,6 +50,7 @@ export type SessionState = {
 
 export type SessionAction =
   | { type: 'init'; plan: SessionPlan }
+  | { type: 'briefed' }
   | { type: 'reveal' }
   | { type: 'grade'; correct: boolean }
   | { type: 'promoEnd' }
@@ -57,10 +59,24 @@ export type SessionAction =
   | { type: 'finish' }
 
 export function initSession(plan: SessionPlan): SessionState {
-  // Powtórki idą PIERWSZE, bo mają termin. Zapoznania są uznaniowe, więc gdy
+  // Odprawa otwiera wieczór: mówi, co dziś robisz i z czego. Jest przed
+  // powtórkami mimo że nie ma terminu, bo to zapowiedź całego wieczoru, a nie
+  // jeden z jego kroków - i musi paść, zanim wsiąkniesz w karty. Kosztuje
+  // jedno kliknięcie i nic nie zapisuje, więc nie zjada budżetu powtórek.
+  //
+  // Dalej powtórki, bo one JEDNE mają termin. Zapoznania są uznaniowe, więc gdy
   // urwiesz sesję w połowie, ma być zrobione to, co na dziś przypadało.
   // Pytania na końcu - wymagają złożenia kilku rzeczy naraz.
   const queue: SessionStep[] = [
+    ...(plan.briefing
+      ? [
+          {
+            key: `briefing-${plan.briefing.task.id}`,
+            kind: 'briefing' as const,
+            briefing: plan.briefing,
+          },
+        ]
+      : []),
     ...plan.reviews.map((card) => ({
       key: `review-${card.id}`,
       kind: 'review' as const,
@@ -120,6 +136,11 @@ export function sessionReducer(
     // kart, które poszły źle.
     case 'init':
       return initSession(action.plan)
+
+    // Odprawa niczego nie zapisuje: zadanie roadmapy odhaczasz na Mapie, po
+    // faktycznej robocie, a nie klikając "dalej" na ekranie, który je zapowiada.
+    case 'briefed':
+      return !step || step.kind !== 'briefing' ? state : advance(state)
 
     case 'reveal':
       return state.revealed ? state : { ...state, revealed: true }

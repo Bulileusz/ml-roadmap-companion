@@ -1,6 +1,6 @@
 import pytest
 
-from repository import questions_repo, tasks_repo
+from repository import questions_repo, resources_repo, tasks_repo
 from services import session, spaced_repetition
 
 
@@ -10,11 +10,14 @@ def test_empty_session_on_a_freshly_seeded_database(client, seeded):
     assert plan["intro"] == []
     assert plan["reviews"] == []
     assert plan["questions"] == []
-    assert plan["total_steps"] == 0
-    # Zero kroków to zero minut, nie "minuta na rozkręcenie się".
-    assert plan["estimated_minutes"] == 0
+    # Nie zero: dopóki roadmapa ma niedokończone zadanie, sesja ma co zapowiedzieć.
+    # "Nic do nauki dziś" i "nie masz nic do roboty" to dwa różne stany.
+    assert plan["total_steps"] == 1
+    # 45 s odprawy + minuta na rozkręcenie się = 105 s, czyli 2 minuty w górę.
+    assert plan["estimated_minutes"] == 2
     assert plan["phase"]["code"] == "0"
     assert plan["next_task"]["title"] == "Postaw środowisko"
+    assert plan["briefing"]["task"]["title"] == "Postaw środowisko"
 
 
 def test_session_orders_the_day_intro_reviews_questions(client, db, phase_id):
@@ -27,8 +30,10 @@ def test_session_orders_the_day_intro_reviews_questions(client, db, phase_id):
     assert [card["front"] for card in plan["intro"]] == ["Świeża"]
     assert [card["front"] for card in plan["reviews"]] == ["Poznana"]
     assert [q["question_text"] for q in plan["questions"]] == ["Po co skalować cechy?"]
-    assert plan["total_steps"] == 3
-    # 20 s + 15 s + 90 s + minuta narzutu = 185 s, czyli 4 minuty w górę.
+    # Cztery, nie trzy: odprawa jest krokiem sesji, choć samo zadanie robisz
+    # poza aplikacją.
+    assert plan["total_steps"] == 4
+    # 45 s + 20 s + 15 s + 90 s + minuta narzutu = 230 s, czyli 4 minuty w górę.
     assert plan["estimated_minutes"] == 4
 
 
@@ -102,6 +107,77 @@ def test_session_survives_a_fully_completed_roadmap(client, db, seeded):
     assert plan["next_task"] is None
     assert plan["phase"]["code"] == "4"
     assert [q["question_text"] for q in plan["questions"]] == ["Z fazy projektowej"]
+    # Nie ma czego zapowiedzieć, więc sesja zaczyna się od powtórek jak dawniej.
+    assert plan["briefing"] is None
+
+
+def test_briefing_carries_the_task_you_are_actually_on(client, db, seeded, phase_id):
+    tasks_repo.update_notes(
+        db,
+        tasks_repo.list_by_phase(db, phase_id)[0]["id"],
+        "Załóż venv.\nGotowe, gdy import numpy przechodzi.",
+    )
+
+    brief = client.get("/api/session/today").json()["briefing"]
+
+    assert brief["task"]["title"] == "Postaw środowisko"
+    assert brief["task"]["phase_id"] == phase_id
+    # Notatka jest sednem odprawy - bez niej ekran pokazuje sam tytuł.
+    assert "Gotowe, gdy" in brief["task"]["notes"]
+    # Licznik mówi, który to punkt fazy: "zadanie 1 z 2".
+    assert (brief["done"], brief["total"]) == (0, 2)
+
+
+def test_briefing_and_questions_come_from_the_same_phase(client, db, seeded):
+    """Zadanie i reszta sesji nie mogą się rozjechać na różne fazy.
+
+    `current_phase` zwraca pierwszą fazę z niedokończonymi zadaniami, a
+    `first_incomplete` pierwsze niedokończone zadanie w tej samej kolejności -
+    więc rozjazd jest niemożliwy. Test przybija tę niezmienniczość, żeby
+    zmiana sortowania w którymkolwiek z nich nie przeszła po cichu.
+    """
+    first = seeded.execute("SELECT id FROM phases WHERE code = '0'").fetchone()["id"]
+    for task in tasks_repo.list_by_phase(db, first):
+        tasks_repo.set_done(db, task["id"], True)
+
+    plan = client.get("/api/session/today").json()
+
+    assert plan["briefing"]["task"]["phase_id"] == plan["phase"]["id"]
+    assert plan["phase"]["code"] == "1"
+
+
+def test_briefing_materials_prefer_started_and_skip_finished(
+    client, db, seeded, phase_id
+):
+    started = resources_repo.create(db, phase_id, "Zaczęty")
+    resources_repo.create(db, phase_id, "Nietknięty")
+    finished = resources_repo.create(db, phase_id, "Przerobiony")
+    resources_repo.update_status(db, started, resources_repo.STATUS_IN_PROGRESS)
+    resources_repo.update_status(db, finished, resources_repo.STATUS_DONE)
+
+    brief = client.get("/api/session/today").json()["briefing"]
+
+    # Zaczęty przed nietkniętym: materiał raz otwarty ma zostać domknięty,
+    # zanim otworzysz trzeci. Przerobiony nie wraca.
+    assert [m["title"] for m in brief["materials"]] == ["Zaczęty", "Nietknięty"]
+
+
+def test_briefing_materials_are_capped(client, db, seeded, phase_id):
+    for index in range(session.MATERIALS_PER_BRIEFING + 2):
+        resources_repo.create(db, phase_id, f"Materiał {index}")
+
+    brief = client.get("/api/session/today").json()["briefing"]
+
+    # Trzy mieszczą się pod zadaniem; przy pięciu to już ekran Zasobów.
+    assert len(brief["materials"]) == session.MATERIALS_PER_BRIEFING
+
+
+def test_briefing_survives_a_phase_without_materials(client, db, seeded):
+    brief = client.get("/api/session/today").json()["briefing"]
+
+    # Zadanie zostaje, blok "skąd to wziąć" po prostu znika.
+    assert brief["materials"] == []
+    assert brief["task"]["title"] == "Postaw środowisko"
 
 
 def test_session_does_not_write_anything(client, db, phase_id):
