@@ -112,6 +112,7 @@ function card(id: number, front: string, back: string, box: number) {
 }
 
 export const SESSION_PLAN: SessionPlan = {
+  questions_gate: null,
   intro: [
     card(101, 'Bias-variance tradeoff', 'Im prostszy model, tym większe obciążenie…', 1),
     card(102, 'Regularyzacja L1 vs L2', 'L1 zeruje wagi, L2 je ściska…', 1),
@@ -173,6 +174,7 @@ export const SESSION_PLAN: SessionPlan = {
 
 /** Nic do zrobienia - osobny stan, bo wygląda zupełnie inaczej niż plan z krokami. */
 export const SESSION_PLAN_EMPTY: SessionPlan = {
+  questions_gate: null,
   intro: [],
   reviews: [],
   reviews_remaining: 0,

@@ -60,6 +60,7 @@ function briefing(over: Partial<Briefing> = {}): Briefing {
 function plan(over: Partial<SessionPlan> = {}): SessionPlan {
   return {
     briefing: null,
+    questions_gate: null,
     intro: [],
     reviews: [],
     reviews_remaining: 0,
@@ -161,6 +162,33 @@ describe('odprawa', () => {
     // roadmapy płaci dopiero przy odhaczeniu na Mapie.
     expect(withBrief.xpTotal).toBe(0)
     expect(withBrief.reviewed).toBe(0)
+  })
+})
+
+describe('odroczone pytanie', () => {
+  const start = () => initSession(plan({ questions: [question(9), question(10)] }))
+
+  it('przesuwa do następnego pytania', () => {
+    const after = run(start(), { type: 'deferred' })
+
+    expect(currentStep(after)?.key).toBe('question-10')
+  })
+
+  it('nie liczy się jako odpowiedź ani do XP', () => {
+    const summary = summarize(run(start(), { type: 'deferred' }, { type: 'deferred' }))
+
+    // „Jeszcze nie umiem" to sygnał „za wcześnie", nie podejście — inaczej
+    // wskaźnik samodzielności mierzyłby, ile razy trafiłeś na pytanie za
+    // wcześnie, zamiast tego, jak często radzisz sobie sam.
+    expect(summary.answered).toBe(0)
+    expect(summary.solo).toBe(0)
+    expect(summary.xpTotal).toBe(0)
+  })
+
+  it('„deferred" poza pytaniem nie robi nic', () => {
+    const state = initSession(plan({ reviews: [card(2, 3)] }))
+
+    expect(sessionReducer(state, { type: 'deferred' })).toBe(state)
   })
 })
 

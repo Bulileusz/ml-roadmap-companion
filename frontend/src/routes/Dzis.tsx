@@ -162,6 +162,14 @@ function Teraz({ plan }: { plan: SessionPlan | undefined }) {
                 .filter(Boolean)
                 .join(' · ')}
         </span>
+        {/* Brak pytań bez powodu wygląda jak usterka, a to jest decyzja:
+            najpierw zobacz materiał, potem odpowiadaj. */}
+        {plan.questions_gate ? (
+          <span className="text-ink-faint tabular text-[0.76rem]">
+            Pytania odblokują się po {plan.questions_gate.needed} poznanych fiszkach tej
+            fazy — masz {plan.questions_gate.learned}.
+          </span>
+        ) : null}
       </div>
 
       {empty ? null : (

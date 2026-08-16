@@ -10,6 +10,10 @@ KIND_TASK_UNDONE = "task_undone"
 KIND_CARD_REVIEW = "card_review"
 KIND_CARD_INTRO = "card_intro"
 KIND_QUESTION_ATTEMPT = "question_attempt"
+# Odroczenie to NIE podejście: "jeszcze nie umiem" znaczy "za wcześnie", a nie
+# "próbowałem i nie wyszło". Osobny rodzaj, żeby wskaźnik samodzielności liczył
+# wyłącznie realne próby, a dziennik i tak pokazywał, że tego wieczoru byłeś.
+KIND_QUESTION_DEFERRED = "question_deferred"
 KIND_RESOURCE_DONE = "resource_done"
 KINDS = (
     KIND_TASK_DONE,

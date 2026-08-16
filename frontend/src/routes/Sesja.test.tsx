@@ -35,6 +35,7 @@ function card(id: number, over: Partial<Flashcard> = {}): Flashcard {
 }
 
 const PLAN: SessionPlan = {
+  questions_gate: null,
   intro: [card(1, { learned_at: null, box: 1, front: 'Czym jest gradient?' })],
   reviews: [card(2, { front: 'Co robi parametr k?', box: 2 }), card(3, { box: 4 })],
   reviews_remaining: 0,
@@ -85,6 +86,7 @@ function stubFetch(planPayload: SessionPlan = PLAN) {
     if (url.endsWith('/api/session/today')) return json(planPayload)
     if (url.includes('/review') || url.includes('/intro')) return json(card(2))
     if (url.includes('/attempts')) return json({ independent: 3, total: 4, pct: 75 })
+    if (url.includes('/defer')) return json(null)
     if (method === 'PATCH') return json(card(1))
     return json({})
   })
@@ -381,5 +383,37 @@ describe('Odprawa', () => {
 
     expect(await screen.findByText('Sesja zakończona')).toBeInTheDocument()
     expect(calls).toEqual([])
+  })
+})
+
+describe('Jeszcze nie umiem', () => {
+  it('odkłada pytanie, nie zapisując podejścia', async () => {
+    renderSesja()
+    await passReviews()
+    await passIntro()
+    await screen.findByText('Dlaczego accuracy bywa myląca?', {}, { timeout: 3000 })
+    calls = []
+
+    await userEvent.click(screen.getByRole('button', { name: /jeszcze nie umiem/i }))
+
+    // Do backendu leci wyłącznie odroczenie. Podejście z „nie umiałem"
+    // zaszumiłoby wskaźnik samodzielności czymś, co próbą nie było.
+    expect(calls).toEqual([
+      { method: 'POST', url: '/api/questions/9/defer', body: null },
+    ])
+    expect(calls.some((c) => c.url.includes('/attempts'))).toBe(false)
+  })
+
+  it('nie dolicza pytania do rachunku sesji', async () => {
+    renderSesja()
+    await passReviews()
+    await passIntro()
+    await screen.findByText('Dlaczego accuracy bywa myląca?', {}, { timeout: 3000 })
+
+    await userEvent.click(screen.getByRole('button', { name: /jeszcze nie umiem/i }))
+
+    expect(await screen.findByText('Sesja zakończona')).toBeInTheDocument()
+    // Wiersz pytań stoi na zerze: odroczenie nie jest odpowiedzią.
+    expect(screen.getByText('0 × 5')).toBeInTheDocument()
   })
 })

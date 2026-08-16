@@ -60,6 +60,19 @@ zadanie odhaczasz na Mapie, po faktycznej robocie. Materiały są przypisem, nie
 tematem: łączy je z zadaniem sama faza, więc lista mówi „to są źródła tej fazy",
 zamiast twierdzić, że dana pozycja jest materiałem do tego zadania.
 
+**Pytania mają próg gotowości**: wchodzą do sesji dopiero, gdy masz w tej fazie co
+najmniej 8 poznanych fiszek. To ta sama zasada, którą fiszki dostały wraz
+z przebiegiem zapoznawczym — pierwszy kontakt z materiałem nie ma być zapisem
+porażki. Bez progu świeża baza podsuwała trzy pytania z fazy, w której nie widziałeś
+ani jednej karty, więc jedyną szczerą odpowiedzią było „sprawdziłem rozwiązanie",
+a wskaźnik samodzielności startował zaszumiony. Ekran startowy mówi wprost, ile
+brakuje — brak pytań bez powodu wyglądałby jak usterka.
+
+Trzeci przycisk pod pytaniem, **„jeszcze nie umiem"**, odkłada je na kilka dni
+i **nie zapisuje podejścia**: to sygnał „za wcześnie", a nie próba. Nie płaci XP,
+więc nie opłaca się go nadużywać, ale też nie kłamie w statystyce. W dzienniku
+zostaje osobny wpis, bo odłożenie pytania to też praca z materiałem.
+
 Dalsza kolejność wynika z tego, co jest zobowiązaniem: **powtórki idą przed
 zapoznaniami, bo mają termin**. Zapoznania są uznaniowe, więc sesja urwana
 w połowie ma mieć zrobione to, co na dziś przypadało. Pytania na końcu, bo wymagają

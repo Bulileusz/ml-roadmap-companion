@@ -36,6 +36,22 @@ def record_question_attempt(
     )
 
 
+def record_question_deferred(conn: sqlite3.Connection, question: sqlite3.Row) -> None:
+    """ "Jeszcze nie umiem": pytanie wraca później, podejście się nie zapisuje.
+
+    Celowo nie dotyka question_attempts. Gdyby odroczenie liczyło się jako
+    nieudane podejście, wskaźnik samodzielności mierzyłby to, ile razy trafiłeś
+    na pytanie za wcześnie - a ma mierzyć, ile razy poradziłeś sobie sam.
+    Wpis w dzienniku zostaje, bo odłożenie pytania to też praca z materiałem.
+    """
+    activity_repo.log(
+        conn,
+        activity_repo.KIND_QUESTION_DEFERRED,
+        question["id"],
+        question["question_text"],
+    )
+
+
 def record_resource_status(
     conn: sqlite3.Connection, resource: sqlite3.Row, status: str
 ) -> None:

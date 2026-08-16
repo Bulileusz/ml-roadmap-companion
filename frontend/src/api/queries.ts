@@ -182,6 +182,18 @@ export function useRecordAttempt() {
   })
 }
 
+/**
+ * „Jeszcze nie umiem" — pytanie wraca za kilka dni, podejście się nie zapisuje.
+ *
+ * Bez unieważniania, jak reszta mutacji sesji. Nie ma zresztą czego odświeżać:
+ * wskaźnik samodzielności celowo się nie rusza, bo odroczenie nie jest próbą.
+ */
+export function useDeferQuestion() {
+  return useMutation({
+    mutationFn: (id: number) => api.post<void>(`/api/questions/${id}/defer`),
+  })
+}
+
 export function useFlashcards() {
   return useQuery({
     queryKey: keys.flashcards,

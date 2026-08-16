@@ -1,5 +1,6 @@
 import sqlite3
 
+from repository import activity_repo
 from services import clock
 
 
@@ -17,7 +18,10 @@ def get(conn: sqlite3.Connection, question_id: int) -> sqlite3.Row | None:
 
 
 def list_for_session(
-    conn: sqlite3.Connection, phase_id: int, limit: int
+    conn: sqlite3.Connection,
+    phase_id: int,
+    limit: int,
+    deferred_since: str | None = None,
 ) -> list[sqlite3.Row]:
     """Pytania do sesji dnia: najpierw nietknięte, potem najdawniej sprawdzane.
 
@@ -26,18 +30,36 @@ def list_for_session(
     właśnie one uczą najwięcej. `COALESCE` na pustym stringu, bo NULL sortuje
     się w SQLite przed każdą datą i pytanie bez podejść i tak wychodzi pierwsze
     dzięki liczbie podejść.
+
+    `deferred_since` odsiewa pytania odłożone przyciskiem "jeszcze nie umiem"
+    po tej dacie. Bez tego odroczenie nie miałoby żadnego skutku: pytanie bez
+    podejść wraca na sam przód sortowania, więc zobaczyłbyś je nazajutrz -
+    a odkładasz je właśnie dlatego, że jest na teraz za wcześnie.
     """
+    filtered = ""
+    params: list[object] = [phase_id]
+    if deferred_since is not None:
+        filtered = (
+            "AND questions.id NOT IN ("
+            "  SELECT ref_id FROM activity_log "
+            "  WHERE kind = ? AND ref_id IS NOT NULL AND occurred_at >= ?"
+            ") "
+        )
+        params += [activity_repo.KIND_QUESTION_DEFERRED, deferred_since]
+    params.append(limit)
+
     return conn.execute(
         "SELECT questions.* FROM questions "
         "LEFT JOIN question_attempts "
         "       ON question_attempts.question_id = questions.id "
         "WHERE questions.phase_id = ? "
+        f"{filtered}"
         "GROUP BY questions.id "
         "ORDER BY COUNT(question_attempts.id), "
         "         COALESCE(MAX(question_attempts.attempted_at), ''), "
         "         questions.id "
         "LIMIT ?",
-        (phase_id, limit),
+        params,
     ).fetchall()
 
 

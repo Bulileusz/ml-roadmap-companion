@@ -4,6 +4,21 @@ from repository import questions_repo, resources_repo, tasks_repo
 from services import session, spaced_repetition
 
 
+def unlock_questions(db, phase_id):
+    """Zdejmuje próg gotowości: pytania fazy wchodzą po ośmiu poznanych fiszkach.
+
+    Karty odsuwamy w przyszłość, bo poznana fiszka z terminem na dziś wpadłaby
+    do powtórek i przestawiła asercje o kolejce - a te testy sprawdzają dobór
+    pytań, nie rotację Leitnera.
+    """
+    for index in range(session.QUESTIONS_UNLOCK_AFTER_LEARNED):
+        spaced_repetition.create_card(db, f"Tło {index}", "Tył", phase_id)
+    db.execute(
+        "UPDATE flashcards SET next_review_at = '2099-01-01' WHERE front LIKE 'Tło %'"
+    )
+    db.commit()
+
+
 def test_empty_session_on_a_freshly_seeded_database(client, seeded):
     plan = client.get("/api/session/today").json()
 
@@ -21,6 +36,7 @@ def test_empty_session_on_a_freshly_seeded_database(client, seeded):
 
 
 def test_session_orders_the_day_intro_reviews_questions(client, db, phase_id):
+    unlock_questions(db, phase_id)
     spaced_repetition.create_card(db, "Świeża", "Tył", phase_id, needs_intro=True)
     spaced_repetition.create_card(db, "Poznana", "Tył", phase_id)
     questions_repo.create(db, phase_id, "Po co skalować cechy?", "concept")
@@ -66,6 +82,7 @@ def test_questions_come_from_the_phase_you_are_actually_in(client, db, seeded):
     second = seeded.execute("SELECT id FROM phases WHERE code = '1'").fetchone()["id"]
     for task in tasks_repo.list_by_phase(db, first):
         tasks_repo.set_done(db, task["id"], True)
+    unlock_questions(db, second)
     questions_repo.create(db, first, "Z fazy 0", "concept")
     questions_repo.create(db, second, "Z fazy 1", "concept")
 
@@ -78,6 +95,7 @@ def test_questions_come_from_the_phase_you_are_actually_in(client, db, seeded):
 def test_untouched_questions_are_picked_before_recently_checked_ones(
     client, db, phase_id
 ):
+    unlock_questions(db, phase_id)
     for index in range(session.QUESTIONS_PER_SESSION + 1):
         questions_repo.create(db, phase_id, f"Pytanie {index}", "concept")
     checked = questions_repo.list_by_phase(db, phase_id)[0]
@@ -98,6 +116,7 @@ def test_session_survives_a_fully_completed_roadmap(client, db, seeded):
         for task in tasks_repo.list_by_phase(db, phase["id"]):
             tasks_repo.set_done(db, task["id"], True)
     last = seeded.execute("SELECT id FROM phases WHERE code = '4'").fetchone()["id"]
+    unlock_questions(db, last)
     questions_repo.create(db, last, "Z fazy projektowej", "concept")
 
     plan = client.get("/api/session/today").json()
@@ -194,6 +213,7 @@ def test_session_does_not_write_anything(client, db, phase_id):
 
 
 def test_questions_carry_their_independence_history(client, db, phase_id):
+    unlock_questions(db, phase_id)
     question_id = questions_repo.create(db, phase_id, "Czym jest bias?", "concept")
     for solo in (True, True, False):
         db.execute(
@@ -215,8 +235,75 @@ def test_questions_carry_their_independence_history(client, db, phase_id):
 
 
 def test_untouched_question_reports_a_clean_slate(client, db, phase_id):
+    unlock_questions(db, phase_id)
     questions_repo.create(db, phase_id, "Nietknięte", "concept")
 
     stats = client.get("/api/session/today").json()["questions"][0]["stats"]
 
     assert stats == {"independent": 0, "total": 0, "pct": 0.0}
+
+
+def test_questions_wait_until_you_have_seen_the_material(client, db, phase_id):
+    """Próg gotowości: bez poznanych fiszek pytania nie wchodzą do sesji.
+
+    To ta sama zasada, którą fiszki dostały wraz z przebiegiem zapoznawczym:
+    pierwszy kontakt z materiałem nie ma być zapisem porażki. Bez progu świeża
+    baza podsuwała trzy pytania z fazy, w której nie widziałeś ani jednej karty.
+    """
+    for index in range(session.QUESTIONS_UNLOCK_AFTER_LEARNED - 1):
+        spaced_repetition.create_card(db, f"Tło {index}", "Tył", phase_id)
+    questions_repo.create(db, phase_id, "Po co skalować cechy?", "concept")
+
+    plan = client.get("/api/session/today").json()
+
+    assert plan["questions"] == []
+    # Powód jedzie do frontu: brak pytań bez wyjaśnienia wygląda jak usterka.
+    assert plan["questions_gate"] == {
+        "learned": session.QUESTIONS_UNLOCK_AFTER_LEARNED - 1,
+        "needed": session.QUESTIONS_UNLOCK_AFTER_LEARNED,
+    }
+
+
+def test_questions_unlock_at_the_threshold(client, db, phase_id):
+    unlock_questions(db, phase_id)
+    questions_repo.create(db, phase_id, "Po co skalować cechy?", "concept")
+
+    plan = client.get("/api/session/today").json()
+
+    assert [q["question_text"] for q in plan["questions"]] == ["Po co skalować cechy?"]
+    assert plan["questions_gate"] is None
+
+
+def test_deferred_question_does_not_come_back_tomorrow(client, db, phase_id):
+    unlock_questions(db, phase_id)
+    questions_repo.create(db, phase_id, "Odłożone", "concept")
+    questions_repo.create(db, phase_id, "Zwykłe", "concept")
+    deferred = questions_repo.list_by_phase(db, phase_id)[0]
+
+    assert client.post(f"/api/questions/{deferred['id']}/defer").status_code == 204
+    plan = client.get("/api/session/today").json()
+
+    # "Jeszcze nie umiem" ma odłożyć pytanie na kilka dni. Bez tego wracałoby
+    # nazajutrz na sam przód kolejki, bo nie ma ani jednego podejścia.
+    assert [q["question_text"] for q in plan["questions"]] == ["Zwykłe"]
+
+
+def test_deferring_is_not_an_attempt(client, db, phase_id):
+    unlock_questions(db, phase_id)
+    questions_repo.create(db, phase_id, "Odłożone", "concept")
+    question = questions_repo.list_by_phase(db, phase_id)[0]
+
+    client.post(f"/api/questions/{question['id']}/defer")
+
+    # Wskaźnik samodzielności mierzy, jak często radzisz sobie sam - a nie ile
+    # razy trafiłeś na pytanie za wcześnie. Odroczenie nie może go ruszyć.
+    attempts = client.get(f"/api/questions/{question['id']}/attempts").json()
+    assert attempts == []
+    dashboard = client.get("/api/dashboard").json()
+    assert dashboard["independence"] == {"independent": 0, "total": 0, "pct": 0.0}
+    # Zero XP: gdyby płaciło, byłby to tańszy sposób na punkty niż odpowiadanie.
+    assert dashboard["progression"]["xp"] == 0
+
+
+def test_deferring_an_unknown_question_is_404(client, seeded):
+    assert client.post("/api/questions/999/defer").status_code == 404

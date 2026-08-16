@@ -443,6 +443,7 @@ export function QuizStage({
   position,
   onAnswer,
   onNext,
+  onDefer,
 }: {
   question: QuestionWithStats
   position: { index: number; total: number }
@@ -450,6 +451,8 @@ export function QuizStage({
   onAnswer: (solo: boolean) => void
   /** Przejście dalej — niesie ten sam wybór, żeby wynik sesji się zgadzał. */
   onNext: (solo: boolean) => void
+  /** „Jeszcze nie umiem" — odkłada pytanie, nie zapisuje podejścia. */
+  onDefer: () => void
 }) {
   const [choice, setChoice] = useState<boolean | null>(null)
   const answer = question.answer.trim()
@@ -511,25 +514,38 @@ export function QuizStage({
       }
       footer={
         choice === null ? (
-          <div className="grid grid-cols-2 gap-3">
-            <GradeTile
-              tone="neutral"
-              label="Musiałem sprawdzić"
-              hint={
-                answer
-                  ? '5 XP · odsłania odpowiedź'
-                  : '5 XP · brak wzorcowej odpowiedzi'
-              }
-              shortcut="1"
-              onClick={() => choose(false)}
-            />
-            <GradeTile
-              tone="success"
-              label="Rozwiązałem samodzielnie"
-              hint="5 XP + 3 XP za samodzielność"
-              shortcut="2"
-              onClick={() => choose(true)}
-            />
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <GradeTile
+                tone="neutral"
+                label="Musiałem sprawdzić"
+                hint={
+                  answer
+                    ? '5 XP · odsłania odpowiedź'
+                    : '5 XP · brak wzorcowej odpowiedzi'
+                }
+                shortcut="1"
+                onClick={() => choose(false)}
+              />
+              <GradeTile
+                tone="success"
+                label="Rozwiązałem samodzielnie"
+                hint="5 XP + 3 XP za samodzielność"
+                shortcut="2"
+                onClick={() => choose(true)}
+              />
+            </div>
+            {/* Trzecie wyjście, celowo słabiej wyeksponowane: to nie jest
+                odpowiedź, tylko przyznanie, że pytanie trafiło za wcześnie.
+                Nie zapisuje podejścia, więc wskaźnik samodzielności zostaje
+                uczciwy — ale nie płaci XP, żeby nie opłacało się go nadużywać. */}
+            <button
+              onClick={onDefer}
+              className="text-ink-faint hover:text-ink-muted flex items-center justify-center gap-2.5 py-1 text-[0.78rem] transition-colors"
+            >
+              <span>Jeszcze nie umiem — odłóż na kilka dni</span>
+              <Kbd>3</Kbd>
+            </button>
           </div>
         ) : (
           <motion.div

@@ -265,6 +265,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/questions/{question_id}/defer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Defer Question
+         * @description „Jeszcze nie umiem" - pytanie wraca za kilka dni, podejście się nie zapisuje.
+         *
+         *     Osobny endpoint, a nie podejście z solved_independently=false, bo to nie
+         *     jest próba. Gdyby odroczenie liczyło się jako nieudane podejście, wskaźnik
+         *     samodzielności mierzyłby, ile razy trafiłeś na pytanie za wcześnie - a ma
+         *     mierzyć, jak często radzisz sobie sam. Stąd też brak odpowiedzi ze
+         *     statystyką: po tym kliknięciu nie ma czego odświeżać.
+         */
+        post: operations["defer_question_api_questions__question_id__defer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/resources": {
         parameters: {
             query?: never;
@@ -935,6 +961,16 @@ export interface components {
             created_at: string;
             stats: components["schemas"]["QuestionStats"];
         };
+        /**
+         * QuestionsGate
+         * @description Czemu w tej sesji nie ma pytań: ile fiszek fazy poznanych, ile trzeba.
+         */
+        QuestionsGate: {
+            /** Learned */
+            learned: number;
+            /** Needed */
+            needed: number;
+        };
         /** Resource */
         Resource: {
             /** Id */
@@ -1009,6 +1045,7 @@ export interface components {
             reviews_remaining: number;
             /** Questions */
             questions: components["schemas"]["QuestionWithStats"][];
+            questions_gate: components["schemas"]["QuestionsGate"] | null;
             phase: components["schemas"]["Phase"] | null;
             next_task: components["schemas"]["NextTask"] | null;
             /** Total Steps */
@@ -1688,6 +1725,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["QuestionStats"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    defer_question_api_questions__question_id__defer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                question_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

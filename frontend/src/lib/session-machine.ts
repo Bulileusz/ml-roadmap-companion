@@ -56,6 +56,7 @@ export type SessionAction =
   | { type: 'promoEnd' }
   | { type: 'introduced' }
   | { type: 'answered'; solo: boolean }
+  | { type: 'deferred' }
   | { type: 'finish' }
 
 export function initSession(plan: SessionPlan): SessionState {
@@ -193,6 +194,12 @@ export function sessionReducer(
         answered: [...state.answered, { id: step.question.id, solo: action.solo }],
       })
     }
+
+    // "Jeszcze nie umiem" nie trafia do `answered`: to nie jest podejście,
+    // tylko sygnał "za wcześnie". Nie liczy się do rachunku i nie rusza
+    // wskaźnika samodzielności - pytanie po prostu wraca za kilka dni.
+    case 'deferred':
+      return !step || step.kind !== 'question' ? state : advance(state)
 
     case 'finish':
       return { ...state, done: true, revealed: false, promo: null }

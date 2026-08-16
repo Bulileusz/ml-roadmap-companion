@@ -335,6 +335,13 @@ class Briefing(BaseModel):
     total: int
 
 
+class QuestionsGate(BaseModel):
+    """Czemu w tej sesji nie ma pytań: ile fiszek fazy poznanych, ile trzeba."""
+
+    learned: int
+    needed: int
+
+
 class SessionPlan(BaseModel):
     # None, gdy cała roadmapa jest odhaczona - wtedy sesja zaczyna się od
     # powtórek, tak jak przed tym PR-em.
@@ -345,6 +352,9 @@ class SessionPlan(BaseModel):
     # Ze statystykami, bo sesja pokazuje wskaźnik samodzielności PRZED
     # odpowiedzią - to informacja o tym, czy z tym pytaniem masz historię.
     questions: list[QuestionWithStats]
+    # None = pytania odblokowane. Nie-None mówi, ile brakuje - brak pytań bez
+    # powodu wygląda jak usterka, a to jest decyzja.
+    questions_gate: QuestionsGate | None
     phase: Phase | None
     next_task: NextTask | None
     total_steps: int

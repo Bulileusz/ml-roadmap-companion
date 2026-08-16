@@ -32,6 +32,11 @@ XP_PER_EVENT = {
     activity_repo.KIND_CARD_REVIEW: 2,
     activity_repo.KIND_CARD_INTRO: 3,
     activity_repo.KIND_QUESTION_ATTEMPT: 5,
+    # Odroczenie nie płaci. Wpisane jawnie, choć nieznane rodzaje i tak są
+    # ignorowane: bez tej linii następna osoba musiałaby wywnioskować z ciszy,
+    # że zero jest decyzją, a nie przeoczeniem. Gdyby płaciło, "jeszcze nie
+    # umiem" stałoby się tańszym sposobem na XP niż zmierzenie się z pytaniem.
+    activity_repo.KIND_QUESTION_DEFERRED: 0,
     activity_repo.KIND_RESOURCE_DONE: 8,
 }
 
