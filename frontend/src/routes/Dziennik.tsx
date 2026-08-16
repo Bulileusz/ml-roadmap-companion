@@ -4,6 +4,7 @@ import { useMemo, useState, type CSSProperties } from 'react'
 import { useDashboard, useJournalDays, usePhases, useSaveDayNote } from '@/api/queries'
 import type { JournalDay, Phase } from '@/api/types'
 import { Page } from '@/components/AppShell'
+import { Dorobek } from '@/components/Dorobek'
 import { Chip, Skeleton } from '@/components/ui/primitives'
 import { cn } from '@/lib/cn'
 import { buildFeed, calendarCells, parseDay } from '@/lib/journal'
@@ -246,6 +247,8 @@ export function Dziennik() {
           ),
         )
       )}
+
+      <Dorobek />
     </Page>
   )
 }

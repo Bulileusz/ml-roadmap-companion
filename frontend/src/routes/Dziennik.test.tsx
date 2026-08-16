@@ -82,6 +82,24 @@ const PHASES: PhaseProgress[] = [
   },
 ]
 
+/** Dorobek wisi na dole Dziennika, więc ten ekran pobiera też osiągnięcia. */
+const ODZNAKI = [
+  {
+    id: 'streak-7',
+    label: '7 dni z rzędu',
+    hint: 'Ucz się 7 dni bez przerwy.',
+    icon: 'Flame',
+    unlocked: true,
+  },
+  {
+    id: 'reviews-100',
+    label: '100 powtórek',
+    hint: 'Zrób 100 powtórek fiszek.',
+    icon: 'RefreshCw',
+    unlocked: false,
+  },
+]
+
 const DASHBOARD = {
   streak: { current: 2, longest: 9, active_days: 4 },
   progression: { xp: 74, level: 2, xp_into_level: 24, xp_for_next_level: 100, pct: 24 },
@@ -121,6 +139,7 @@ beforeEach(() => {
       if (url.includes('/api/journal/days')) return json(DAYS)
       if (url.endsWith('/api/phases')) return json(PHASES)
       if (url.endsWith('/api/dashboard')) return json(DASHBOARD)
+      if (url.endsWith('/api/achievements')) return json(ODZNAKI)
       if (url.includes('/note')) {
         const body = JSON.parse(String(init?.body)) as { note: string }
         return json({ day: url.split('/')[4], note: body.note })
@@ -242,6 +261,16 @@ describe('Dziennik', () => {
       screen.getByRole('button', { name: 'Pokaż z powrotem wszystkie dni' }),
     )
     expect(screen.getByText('4 wpisy')).toBeInTheDocument()
+  })
+
+  it('na dole ma dorobek — bez własnego ekranu i bez pozycji w nawigacji', async () => {
+    renderDziennik()
+
+    expect(await screen.findByText('Dorobek')).toBeInTheDocument()
+    expect(screen.getByText('7 dni z rzędu')).toBeInTheDocument()
+    expect(screen.getByText('1 z 2')).toBeInTheDocument()
+    // Niezdobyte czekają za przełącznikiem, żeby lista nie była ścianą.
+    expect(screen.queryByText('100 powtórek')).toBeNull()
   })
 
   it('dzień bez sesji nie jest klikalny i mówi to wprost', async () => {

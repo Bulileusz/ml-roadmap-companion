@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
 import { HotkeyCheatsheet } from '@/components/HotkeyCheatsheet'
+import { UnlockToast } from '@/components/UnlockToast'
 import { Kbd } from '@/components/ui/primitives'
 import { cn } from '@/lib/cn'
 import { useHotkeys } from '@/lib/hotkeys-context'
@@ -54,6 +55,9 @@ export function AppShell() {
         </AnimatePresence>
       </main>
       <HotkeyCheatsheet open={cheatsheetOpen} onOpenChange={setCheatsheetOpen} />
+      {/* W powłoce, nie na ekranie sesji: domknięcie fazy przychodzi
+          z odhaczenia zadania na Mapie, a nie z powtórki. */}
+      <UnlockToast />
     </div>
   )
 }
