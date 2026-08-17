@@ -112,6 +112,7 @@ function card(id: number, front: string, back: string, box: number) {
 }
 
 export const SESSION_PLAN: SessionPlan = {
+  questions_gate: null,
   intro: [
     card(101, 'Bias-variance tradeoff', 'Im prostszy model, tym większe obciążenie…', 1),
     card(102, 'Regularyzacja L1 vs L2', 'L1 zeruje wagi, L2 je ściska…', 1),
@@ -124,23 +125,63 @@ export const SESSION_PLAN: SessionPlan = {
   reviews_remaining: 6,
   questions: [],
   phase: PHASE_IN_PROGRESS.phase,
+  briefing: {
+    task: {
+      id: 23,
+      phase_id: 3,
+      title: 'Walidacja krzyżowa bez wycieku danych',
+      phase_name: 'Faza 2 - Uczenie nadzorowane',
+      notes:
+        'Zbuduj pipeline, w którym skalowanie liczy się wewnątrz każdego foldu, ' +
+        'nie przed podziałem. Porównaj wynik z wersją z wyciekiem.\n' +
+        'Gotowe, gdy różnica accuracy między wersjami jest widoczna i umiesz ją wyjaśnić.',
+    },
+    materials: [
+      {
+        id: 41,
+        phase_id: 3,
+        title: 'scikit-learn: walidacja krzyżowa',
+        url: 'https://scikit-learn.org/stable/modules/cross_validation.html',
+        kind: 'docs',
+        detail: '',
+        status: 'in_progress',
+        order_index: 0,
+      },
+      {
+        id: 42,
+        phase_id: 3,
+        title: 'scikit-learn: Pipeline',
+        url: 'https://scikit-learn.org/stable/modules/compose.html',
+        kind: 'docs',
+        detail: '',
+        status: 'todo',
+        order_index: 1,
+      },
+    ],
+    done: 2,
+    total: 6,
+  },
   next_task: {
     id: 23,
     phase_id: 3,
     title: 'Walidacja krzyżowa bez wycieku danych',
     phase_name: 'Faza 2 - Uczenie nadzorowane',
+    notes: 'Zbuduj pipeline bez wycieku danych.',
   },
-  total_steps: 5,
-  estimated_minutes: 24,
+  total_steps: 6,
+  estimated_minutes: 25,
 }
 
 /** Nic do zrobienia - osobny stan, bo wygląda zupełnie inaczej niż plan z krokami. */
 export const SESSION_PLAN_EMPTY: SessionPlan = {
+  questions_gate: null,
   intro: [],
   reviews: [],
   reviews_remaining: 0,
   questions: [],
   phase: PHASE_DONE.phase,
+  // Domknięta roadmapa: nie ma czego zapowiedzieć, więc odprawy też nie ma.
+  briefing: null,
   next_task: null,
   total_steps: 0,
   estimated_minutes: 0,

@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState, type CSSProperties } from 'rea
 import { useNavigate } from 'react-router'
 
 import {
+  useDeferQuestion,
   useFinishSession,
   useIntroduceCard,
   useRecordAttempt,
@@ -10,7 +11,12 @@ import {
   useSessionPlan,
 } from '@/api/queries'
 import { Summary } from '@/components/session/Summary'
-import { IntroStage, QuizStage, ReviewStage } from '@/components/session/stages'
+import {
+  BriefingStage,
+  IntroStage,
+  QuizStage,
+  ReviewStage,
+} from '@/components/session/stages'
 import { Badge, Kbd, Skeleton } from '@/components/ui/primitives'
 import { celebrate, celebrateBig } from '@/lib/confetti'
 import { useHotkeys } from '@/lib/hotkeys-context'
@@ -32,6 +38,8 @@ import {
 const PROMO_MS = 950
 
 const EMPTY: SessionState = initSession({
+  briefing: null,
+  questions_gate: null,
   intro: [],
   reviews: [],
   reviews_remaining: 0,
@@ -51,6 +59,7 @@ export function Sesja() {
   const introduce = useIntroduceCard()
   const saveNote = useSaveOwnNote()
   const recordAttempt = useRecordAttempt()
+  const deferQuestion = useDeferQuestion()
 
   // Dwie maszyny, nie jedna przełączana: przebieg poprawkowy nie ma prawa
   // nadpisać wyniku sesji, a wynik dzięki temu jest zwykłą pochodną stanu,
@@ -115,6 +124,14 @@ export function Sesja() {
     dispatch({ type: 'introduced' })
   }
 
+  function defer() {
+    if (step?.kind !== 'question') return
+    // Do backendu leci tylko wpis do dziennika - żadnego podejścia. Przebieg
+    // poprawkowy nie zawiera pytań, więc nie ma tu warunku na `drilling`.
+    deferQuestion.mutate(step.question.id)
+    dispatch({ type: 'deferred' })
+  }
+
   function redo() {
     if (!plan || !summary || summary.misses.length === 0) return
     const missed = plan.reviews.filter((card) => summary.misses.includes(card.id))
@@ -122,7 +139,9 @@ export function Sesja() {
     setDrillStarted(true)
     dispatchDrill({
       type: 'init',
-      plan: { ...plan, intro: [], questions: [], reviews: missed },
+      // briefing wyzerowany jawnie: spread przepuściłby go z planu i przebieg
+      // poprawkowy zaczynałby się od drugiej odprawy tego samego zadania.
+      plan: { ...plan, briefing: null, intro: [], questions: [], reviews: missed },
     })
   }
 
@@ -160,11 +179,19 @@ export function Sesja() {
       handler: () => state.revealed && grade(true),
     },
     {
+      keys: '3',
+      description: 'Jeszcze nie umiem — odłóż pytanie',
+      group: 'Sesja',
+      handler: () => defer(),
+    },
+    {
       keys: 'enter',
       description: 'Dalej',
       group: 'Sesja',
       handler: () => {
-        if (step?.kind === 'review' && !state.revealed) dispatch({ type: 'reveal' })
+        if (step?.kind === 'briefing') dispatch({ type: 'briefed' })
+        else if (step?.kind === 'review' && !state.revealed)
+          dispatch({ type: 'reveal' })
         else if (onSummary) void navigate('/')
       },
     },
@@ -268,6 +295,12 @@ export function Sesja() {
           plan={plan}
           onRedo={summary.misses.length > 0 ? redo : null}
         />
+      ) : step?.kind === 'briefing' ? (
+        <BriefingStage
+          key={step.key}
+          briefing={step.briefing}
+          onNext={() => dispatch({ type: 'briefed' })}
+        />
       ) : step?.kind === 'review' ? (
         <ReviewStage
           key={step.key}
@@ -295,6 +328,7 @@ export function Sesja() {
           position={questionQuota(state, step.question.id)}
           onAnswer={(solo) => recordAttempt.mutate({ id: step.question.id, solo })}
           onNext={(solo) => dispatch({ type: 'answered', solo })}
+          onDefer={defer}
         />
       ) : (
         <EmptyPlan />

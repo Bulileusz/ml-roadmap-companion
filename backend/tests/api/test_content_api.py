@@ -11,7 +11,12 @@ def test_status_reports_files_next_to_what_is_already_imported(client, seeded):
     assert status["available"]["resources"] > 0
     # Przed pierwszym importem zera, nie pusty słownik: obie połówki wiersza na
     # stronie Dane mówią tym samym słownikiem, żeby dały się zestawić.
-    assert status["imported"] == {"flashcards": 0, "questions": 0, "resources": 0}
+    assert status["imported"] == {
+        "flashcards": 0,
+        "questions": 0,
+        "resources": 0,
+        "tasks": 0,
+    }
 
 
 def test_sync_imports_the_repo_content_and_is_idempotent(client, db, seeded):

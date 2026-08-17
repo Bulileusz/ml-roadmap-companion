@@ -23,6 +23,7 @@ import { cn } from '@/lib/cn'
  */
 
 const CONTENT_LABEL: Record<string, string> = {
+  tasks: 'Zadania',
   flashcards: 'Fiszki',
   questions: 'Pytania',
   resources: 'Materiały',
@@ -147,13 +148,15 @@ function Tresc() {
           className="rounded-control border-line bg-surface mt-4 border px-4 py-3"
         >
           <p className="text-ink text-[0.82rem]">
-            {result.flashcards_added +
+            {result.tasks_added +
+              result.flashcards_added +
               result.questions_added +
               result.resources_added +
               result.answers_filled ===
             0
               ? 'Nic nowego — pliki i baza są zgodne.'
               : [
+                  result.tasks_added ? `${result.tasks_added} zadań` : null,
                   result.flashcards_added ? `${result.flashcards_added} fiszek` : null,
                   result.questions_added ? `${result.questions_added} pytań` : null,
                   result.resources_added

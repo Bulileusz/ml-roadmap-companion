@@ -35,3 +35,15 @@ musi być liczony wewnątrz foldów walidacji.
 https://scikit-learn.org/stable/modules/preprocessing.html
 Skalowanie, dyskretyzacja, cechy wielomianowe, transformacje nieliniowe.
 Do przejrzenia pod kątem tego, co drzewom jest zbędne, a modelom liniowym nie.
+
+## [docs] scikit-learn: partial dependence i ICE plots
+https://scikit-learn.org/stable/modules/partial_dependence.html
+Permutation importance mówi, **które** cechy są ważne; to mówi, **jak** wpływają
+na predykcję. Przy danych z budownictwa kierunek zależności („powyżej jakiej
+wilgotności jakość spada") jest użyteczniejszy niż sam ranking słupków.
+
+## [docs] scikit-learn: wybór metryki w walidacji (scoring)
+https://scikit-learn.org/stable/modules/model_evaluation.html
+Który `scoring` podać do GridSearchCV i dlaczego domyślne `accuracy` bywa
+pułapką. Kluczowe przy niezbalansowanych klasach — a wykrywanie wad zawsze
+takie jest: model, który mówi „bez wady", ma świetną dokładność i zero wartości.

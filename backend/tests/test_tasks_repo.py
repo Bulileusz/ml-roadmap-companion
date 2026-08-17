@@ -1,4 +1,7 @@
-from repository import phases_repo, tasks_repo
+import pytest
+
+from repository import content_imports_repo, phases_repo, tasks_repo
+from services import content
 
 
 def _make_phase(conn, code="0", name="Faza 0"):
@@ -105,3 +108,109 @@ def test_phases_list_all_ordered(conn):
 
     phases = phases_repo.list_all(conn)
     assert [p["code"] for p in phases] == ["early", "late"]
+
+
+# --- Import roadmapy z content/tasks/ -------------------------------------
+# Zadania weszły w ten sam tryb co fiszki, pytania i materiały: addytywnie,
+# po kluczu, bez wskrzeszania skasowanych. Zestaw przypadków jest ten sam,
+# co w test_resources.py - to ta sama umowa, więc ma być tak samo pilnowana.
+
+
+@pytest.fixture
+def content_root(tmp_path):
+    for name in ("flashcards", "questions", "resources", "tasks"):
+        (tmp_path / name).mkdir()
+    return tmp_path
+
+
+def _write_tasks(root, name, text):
+    (root / "tasks" / name).write_text(text, encoding="utf-8")
+
+
+def test_sync_imports_tasks_with_notes(conn, content_root):
+    phase_id = _make_phase(conn)
+    _write_tasks(
+        content_root,
+        "0-python.md",
+        "# Faza 0\n\n"
+        "## Postaw środowisko\n"
+        "Załóż venv przez uv.\n"
+        "Gotowe, gdy import numpy przechodzi.\n\n"
+        "## Przećwicz broadcasting\n"
+        "Napisz skrypt na pięciu kształtach.\n",
+    )
+
+    result = content.sync(conn, content_root)
+
+    assert result.tasks_added == 2
+    tasks = tasks_repo.list_by_phase(conn, phase_id)
+    assert [t["title"] for t in tasks] == [
+        "Postaw środowisko",
+        "Przećwicz broadcasting",
+    ]
+    # Notatka niesie "co zrobić" i "Gotowe, gdy" - bez niej odprawa jest pusta.
+    assert tasks[0]["notes"].startswith("Załóż venv")
+    assert "Gotowe, gdy" in tasks[0]["notes"]
+    # Kolejność z pliku jest kolejnością nauki, więc musi przetrwać import.
+    assert [t["order_index"] for t in tasks] == [0, 1]
+
+
+def test_task_sync_is_idempotent(conn, content_root):
+    _make_phase(conn)
+    _write_tasks(content_root, "0-python.md", "## Jedyne\nOpis.\n")
+
+    content.sync(conn, content_root)
+    second = content.sync(conn, content_root)
+
+    assert second.tasks_added == 0
+    assert conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 1
+
+
+def test_deleted_task_does_not_come_back(conn, content_root):
+    phase_id = _make_phase(conn)
+    _write_tasks(content_root, "0-python.md", "## Do skasowania\nOpis.\n")
+    content.sync(conn, content_root)
+
+    task_id = tasks_repo.list_by_phase(conn, phase_id)[0]["id"]
+    tasks_repo.delete(conn, task_id)
+    content.sync(conn, content_root)
+
+    assert tasks_repo.list_by_phase(conn, phase_id) == []
+
+
+def test_task_with_unknown_phase_code_is_reported(conn, content_root):
+    _make_phase(conn)
+    _write_tasks(content_root, "9-nieznana.md", "## Zadanie\nOpis.\n")
+
+    result = content.sync(conn, content_root)
+
+    assert result.tasks_added == 0
+    assert any("nieznany kod fazy '9'" in warning for warning in result.warnings)
+
+
+def test_task_without_notes_is_imported_but_flagged(conn, content_root):
+    phase_id = _make_phase(conn)
+    _write_tasks(content_root, "0-python.md", "## Sam tytuł\n")
+
+    result = content.sync(conn, content_root)
+
+    # Wjeżdża, bo lepiej mieć zadanie bez opisu niż zgubioną pozycję roadmapy -
+    # ale ostrzeżenie ma być, żeby luka nie została w treści na zawsze.
+    assert result.tasks_added == 1
+    assert tasks_repo.list_by_phase(conn, phase_id)[0]["notes"] == ""
+    assert any("bez opisu" in warning for warning in result.warnings)
+
+
+def test_task_ledger_uses_its_own_kind(conn, content_root):
+    _make_phase(conn)
+    _write_tasks(content_root, "0-python.md", "## Zadanie\nOpis.\n")
+
+    content.sync(conn, content_root)
+
+    keys = content_imports_repo.imported_keys(conn, content_imports_repo.KIND_TASK)
+    assert keys == {"0|zadanie"}
+    # Rodzaje się nie mieszają - materiał o tym samym tytule wjedzie osobno.
+    resources = content_imports_repo.imported_keys(
+        conn, content_imports_repo.KIND_RESOURCE
+    )
+    assert resources == set()

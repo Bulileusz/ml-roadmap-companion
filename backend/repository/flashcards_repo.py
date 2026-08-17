@@ -48,6 +48,20 @@ def count_intro_queue(conn: sqlite3.Connection) -> int:
     ).fetchone()[0]
 
 
+def count_learned_by_phase(conn: sqlite3.Connection, phase_id: int) -> int:
+    """Ile fiszek tej fazy masz już za sobą w przebiegu zapoznawczym.
+
+    Miara "czy zdążyłeś zobaczyć materiał": pytania z fazy odblokowują się
+    dopiero powyżej progu (services/session.py). Liczymy poznane, nie wszystkie
+    istniejące - sto zaimportowanych kart, których nigdy nie widziałeś, nie
+    czyni cię gotowym na pytania.
+    """
+    return conn.execute(
+        f"SELECT COUNT(*) FROM flashcards WHERE phase_id = ? AND {_LEARNED}",
+        (phase_id,),
+    ).fetchone()[0]
+
+
 def count_by_box(conn: sqlite3.Connection) -> dict[int, int]:
     # Tylko poznane: karta przed zapoznaniem siedzi formalnie w pudełku 1, ale
     # pokazywanie jej na wykresie pudełek kłamałoby o stanie nauki. Kolejka

@@ -28,6 +28,7 @@ def sync(conn: DbConn):
         "flashcards_added": result.flashcards_added,
         "questions_added": result.questions_added,
         "resources_added": result.resources_added,
+        "tasks_added": result.tasks_added,
         "answers_filled": result.answers_filled,
         "skipped": result.skipped,
         "warnings": result.warnings,

@@ -129,7 +129,11 @@ function Teraz({ plan }: { plan: SessionPlan | undefined }) {
     )
   }
 
-  const empty = plan.total_steps === 0
+  // Liczone z samej nauki, nie z total_steps: odprawa jest krokiem sesji, ale
+  // istnieje dopóty, dopóki roadmapa ma niedokończone zadanie — czyli prawie
+  // zawsze. Gdyby wchodziła do tego warunku, „na dziś czysto" nie pojawiłoby
+  // się już nigdy, a to jest stan, który ma prawo wystąpić i coś znaczy.
+  const empty = plan.intro.length + plan.reviews.length + plan.questions.length === 0
   const boxes = plan.reviews.map((card) => card.box)
   const range =
     boxes.length === 0
@@ -158,6 +162,14 @@ function Teraz({ plan }: { plan: SessionPlan | undefined }) {
                 .filter(Boolean)
                 .join(' · ')}
         </span>
+        {/* Brak pytań bez powodu wygląda jak usterka, a to jest decyzja:
+            najpierw zobacz materiał, potem odpowiadaj. */}
+        {plan.questions_gate ? (
+          <span className="text-ink-faint tabular text-[0.76rem]">
+            Pytania odblokują się po {plan.questions_gate.needed} poznanych fiszkach tej
+            fazy — masz {plan.questions_gate.learned}.
+          </span>
+        ) : null}
       </div>
 
       {empty ? null : (

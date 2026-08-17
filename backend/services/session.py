@@ -9,14 +9,25 @@ plan wystarczy policzyć od nowa.
 
 import math
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 
-from repository import phases_repo, questions_repo, tasks_repo
+from repository import (
+    flashcards_repo,
+    phases_repo,
+    questions_repo,
+    resources_repo,
+    tasks_repo,
+)
 from services import clock, progress, spaced_repetition
 
 # Limity jednej sesji. Kolejka zapoznawcza przejęła rolę dawnego
 # NEW_CARDS_PER_DAY: wgranie stu fiszek z content/ nie ma dać stu nowych kart
 # do przerobienia w jeden wieczór.
+# Ile materiałów pokazać na odprawie. Trzy mieszczą się pod zadaniem jednym
+# rzutem oka; przy pięciu robi się lista do przewijania, a wtedy jesteś na
+# ekranie Zasobów, nie w sesji.
+MATERIALS_PER_BRIEFING = 3
+
 INTROS_PER_SESSION = 5
 # Powtórki nie znikają, jeśli nie zmieszczą się w sesji - zaległe zostają
 # zaległe. Sufit jest po to, żeby licznik postępu na górze ekranu miał
@@ -25,6 +36,25 @@ INTROS_PER_SESSION = 5
 MAX_REVIEWS_PER_SESSION = 20
 QUESTIONS_PER_SESSION = 3
 
+# Ile fiszek fazy trzeba mieć poznanych, zanim wejdą jej pytania.
+#
+# Fiszki dostały przebieg zapoznawczy właśnie po to, żeby pierwszy kontakt
+# z materiałem nie był zapisem porażki. Pytania takiej warstwy nie miały:
+# na świeżej bazie sesja od razu podsuwała trzy pytania z fazy, w której nie
+# widziałeś jeszcze ani jednej karty, więc jedyną szczerą odpowiedzią było
+# "sprawdziłem rozwiązanie". Wskaźnik samodzielności startował zaszumiony
+# i przez pierwsze tygodnie nie mierzył niczego.
+#
+# Osiem, bo tyle mniej więcej daje pierwszy tydzień zapoznań przy limicie
+# pięciu kart na sesję - próg ma opóźnić pytania o kilka wieczorów, a nie
+# schować je na miesiąc.
+QUESTIONS_UNLOCK_AFTER_LEARNED = 8
+
+# Ile dni pytanie odłożone przez "jeszcze nie umiem" nie wraca do sesji.
+# Krócej niż tydzień, bo to ma być odłożenie, nie schowanie; dłużej niż jeden
+# wieczór, bo inaczej jutro znów odbijesz się od tego samego pytania.
+QUESTION_DEFER_DAYS = 3
+
 # Szacowanie czasu - z obserwacji, nie z pomiaru: karta zapoznawcza to
 # przeczytanie obu stron, powtórka to sekunda namysłu i klik, pytanie
 # koncepcyjne to realne półtorej minuty. Plus minuta na rozkręcenie się.
@@ -32,6 +62,11 @@ SECONDS_PER_INTRO = 20
 SECONDS_PER_REVIEW = 15
 SECONDS_PER_QUESTION = 90
 SESSION_OVERHEAD_SECONDS = 60
+# Odprawa to przeczytanie, co dziś robisz - nie sama robota. Zadanie roadmapy
+# zajmie wieczór, ale dzieje się poza aplikacją, więc doliczanie go tutaj
+# wyrzuciłoby szacunek sesji z czterech minut na sześćdziesiąt cztery
+# i zniechęcało dokładnie tak, jak opisuje komentarz przy sufcie powtórek.
+SECONDS_PER_BRIEFING = 45
 
 
 def current_phase(conn: sqlite3.Connection) -> sqlite3.Row | None:
@@ -48,15 +83,70 @@ def current_phase(conn: sqlite3.Connection) -> sqlite3.Row | None:
     return phases[-1] if phases else None
 
 
-def estimate_seconds(intro: int, reviews: int, questions: int) -> int:
-    if intro + reviews + questions == 0:
+def estimate_seconds(
+    intro: int, reviews: int, questions: int, briefing: int = 0
+) -> int:
+    if intro + reviews + questions + briefing == 0:
         return 0
     return (
         intro * SECONDS_PER_INTRO
         + reviews * SECONDS_PER_REVIEW
         + questions * SECONDS_PER_QUESTION
+        + briefing * SECONDS_PER_BRIEFING
         + SESSION_OVERHEAD_SECONDS
     )
+
+
+def questions_for(
+    conn: sqlite3.Connection, phase: sqlite3.Row | None, today: date
+) -> tuple[list[sqlite3.Row], dict | None]:
+    """Pytania do sesji albo powód, dla którego jeszcze ich nie ma.
+
+    Zwraca parę: listę pytań i - gdy próg nie jest osiągnięty - licznik
+    "masz N z M poznanych fiszek". Powód jedzie do frontu, bo brak pytań bez
+    wyjaśnienia wygląda jak usterka, a to jest decyzja: najpierw zobacz
+    materiał, potem odpowiadaj.
+    """
+    if phase is None:
+        return [], None
+
+    learned = flashcards_repo.count_learned_by_phase(conn, phase["id"])
+    if learned < QUESTIONS_UNLOCK_AFTER_LEARNED:
+        return [], {"learned": learned, "needed": QUESTIONS_UNLOCK_AFTER_LEARNED}
+
+    deferred_since = (today - timedelta(days=QUESTION_DEFER_DAYS)).isoformat()
+    questions = questions_repo.list_for_session(
+        conn, phase["id"], QUESTIONS_PER_SESSION, deferred_since=deferred_since
+    )
+    return questions, None
+
+
+def briefing(conn: sqlite3.Connection) -> dict | None:
+    """Odprawa: co dziś robisz, z czego i który to punkt fazy.
+
+    Zadanie roadmapy zajmuje wieczór, a sesja kilkanaście minut - te dwie rzeczy
+    nie mieszczą się w jednym przebiegu. Dlatego to jest **zapowiedź, nie praca**:
+    ekran mówi, co masz dziś zrobić, i schodzi z drogi. Odhaczenie następuje na
+    Mapie, po faktycznej robocie, więc ten krok niczego nie zapisuje.
+
+    Materiały są przypisem, nie połową ekranu: łączy je z zadaniem tylko faza,
+    więc lista mówi uczciwie "to są źródła tej fazy", zamiast twierdzić, że
+    dana pozycja jest materiałem do tego konkretnego zadania.
+    """
+    task = tasks_repo.first_incomplete(conn)
+    if task is None:
+        return None
+
+    phase_id = task["phase_id"]
+    done, total = tasks_repo.count_progress(conn, phase_id)
+    return {
+        "task": task,
+        "materials": resources_repo.list_for_session(
+            conn, phase_id, MATERIALS_PER_BRIEFING
+        ),
+        "done": done,
+        "total": total,
+    }
 
 
 def plan(conn: sqlite3.Connection, today: date | None = None) -> dict:
@@ -78,22 +168,25 @@ def plan(conn: sqlite3.Connection, today: date | None = None) -> dict:
     reviews = due[:MAX_REVIEWS_PER_SESSION]
 
     phase = current_phase(conn)
-    questions = (
-        questions_repo.list_for_session(conn, phase["id"], QUESTIONS_PER_SESSION)
-        if phase is not None
-        else []
-    )
+    questions, gate = questions_for(conn, phase, reference)
 
-    seconds = estimate_seconds(len(intro), len(reviews), len(questions))
+    brief = briefing(conn)
+    seconds = estimate_seconds(
+        len(intro), len(reviews), len(questions), 1 if brief else 0
+    )
     return {
+        "briefing": brief,
         "intro": intro,
         "reviews": reviews,
         # Ile powtórek nie weszło do tej sesji. Pokazywane obok licznika, żeby
         # sufit był widoczną decyzją, a nie po cichu ukrytą zaległością.
         "reviews_remaining": max(len(due) - len(reviews), 0),
         "questions": questions,
+        # None = pytania są odblokowane. Nie-None niesie licznik, którym front
+        # tłumaczy, czemu ich dziś nie ma.
+        "questions_gate": gate,
         "phase": phase,
         "next_task": tasks_repo.first_incomplete(conn),
-        "total_steps": len(intro) + len(reviews) + len(questions),
+        "total_steps": len(intro) + len(reviews) + len(questions) + (1 if brief else 0),
         "estimated_minutes": math.ceil(seconds / 60),
     }

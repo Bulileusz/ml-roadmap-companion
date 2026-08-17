@@ -1,8 +1,19 @@
 # ml-roadmap-companion — konwencje
 
-Ciemny motyw „premium edu" do codziennej nauki ML. Zasada nadrzędna: **kolor
-niesie znaczenie**. Płótno jest neutralne i ciemne, a jedyną rzeczą, która
-świeci, jest treść i postęp.
+Ciemny motyw **„oś"** do codziennej nauki ML. Dwie zasady nadrzędne:
+
+1. **Kolor niesie znaczenie.** Płótno jest neutralne i ciemne, a jedyną rzeczą,
+   która świeci, jest treść i postęp.
+2. **Hierarchię niesie typografia i włosowa kreska, nie ramka i cień.** Jedna
+   wąska kolumna treści (720 px) zamiast siatki kafelków, oś czasu zamiast
+   paneli obok siebie.
+
+Wcześniejszy kierunek — „premium edu" z siatką kart, cieniami i pierścieniami
+postępu — został świadomie zastąpiony. Tokeny głębi (`shadow-raise`,
+`rounded-card`) zostały w arkuszu, bo dalej niosą **pojedynczą** powierzchnię:
+dialog, wyróżniony blok. Nie są sposobem układania strony. Projektując nowy
+ekran: gęsta lista, kreska zamiast ramki, kolor fazy jako lewa krawędź albo
+kropka.
 
 ## Ciemne płótno jest wymagane
 
@@ -13,28 +24,29 @@ tokenami, nie domyślnym tłem przeglądarki.
 
 ## Konteksty: kiedy potrzebny jest `DesignPreviewProvider`
 
-Cztery komponenty czytają kontekst i **bez owinięcia renderują się pusto albo
-rzucają błędem**:
+Dwa komponenty czytają kontekst i **bez owinięcia rzucają błędem albo renderują
+się pusto**:
 
 | Komponent | Czego wymaga |
 |---|---|
-| `PhaseCard` | klienta TanStack Query (dociąga zadania po rozwinięciu) |
-| `AppShell`, `SessionHero` | routera (`NavLink`, `useNavigate`) |
-| `HotkeyCheatsheet` | rejestru skrótów — pustego renderuje pusty dialog |
+| `AppShell` | routera (`NavLink`, `useNavigate`), rejestru skrótów oraz klienta TanStack Query — renderuje `UnlockToast`, który odpytuje o osiągnięcia |
+| `HotkeyCheatsheet` | rejestru skrótów — bez niego renderuje pusty dialog |
 
-`DesignPreviewProvider` (eksport bundla) dostarcza wszystkie cztery naraz:
+Reszta (`Card`, `Button`, `Badge`, `Chip`, `ProgressBar`, `AnimatedNumber`,
+`EmptyState`, `AllDone`, `Skeleton`, `Kbd`, `StreakFlame`, `LevelBar`) to czyste
+komponenty prezentacyjne — biorą wszystko przez props i działają bez owinięcia.
+
+`DesignPreviewProvider` (eksport bundla) dostarcza wszystkie konteksty naraz:
 `MotionConfig` → `QueryClientProvider` → `MemoryRouter` → `HotkeysProvider`.
-Owiń nim całość:
 
 ```jsx
 <DesignPreviewProvider>
-  <StatCard label="Postęp roadmapy" value="41%" pct={41} color="var(--color-info)" icon={Target} />
+  <AppShell />
 </DesignPreviewProvider>
 ```
 
-Uwaga: router jest pamięciowy, a cache zapytań pusty — rozwinięty `PhaseCard`
-pokaże stan „brak zadań", dopóki nie dosiejesz danych. Skróty do `HotkeyCheatsheet`
-rejestruje się hookiem `useHotkeys` (też eksport bundla).
+Uwaga: router jest pamięciowy, a cache zapytań pusty. Skróty do
+`HotkeyCheatsheet` rejestruje się hookiem `useHotkeys` (też eksport bundla).
 
 ## Idiom stylowania: Tailwind v4 na tokenach `@theme`
 
@@ -54,9 +66,9 @@ a kolory i kształty bierzesz z tokenów systemu.
 
 **Ostrzeżenie — to nie jest pełny Tailwind.** Arkusz zawiera wyłącznie klasy
 faktycznie użyte w tym repo, i to dokładnie w użytych wariantach: jest
-`bg-success/8`, ale nie ma `bg-success`. `text-info`, `text-warn`, `text-ember`,
-`bg-overlay` i `bg-danger` **nie mają reguł** i nie zadziałają. Dla wszystkiego
-spoza tabeli używaj zmiennej CSS, która zawsze jest zdefiniowana:
+`bg-success/8`, ale nie ma `bg-success`. `text-info`, `text-warn`, `text-ember`
+i `bg-danger` **nie mają reguł** i nie zadziałają. Dla wszystkiego spoza tabeli
+używaj zmiennej CSS, która zawsze jest zdefiniowana:
 
 ```jsx
 <span style={{ color: 'var(--color-ember)' }}>seria</span>
@@ -72,15 +84,16 @@ Zdefiniowane tokeny koloru: `--color-canvas` `--color-surface` `--color-raised`
 
 Każda faza roadmapy ma własną barwę. Nie ma i nie może być klasy Tailwinda per
 faza (fazy pochodzą z bazy). Ustawiasz zmienną `--phase` na rodzicu, a `Badge`,
-`ProgressRing`, `ProgressBar` i `phase-wash` biorą ją domyślnie:
+`ProgressBar` i `phase-wash` biorą ją domyślnie:
 
 ```jsx
-<div style={{ '--phase': '#a855f7' }}>
-  <Card className="phase-wash p-5">
-    <Badge>Faza 2</Badge>
-    <p className="font-display text-ink mt-2 font-bold">Uczenie nadzorowane</p>
-    <ProgressBar pct={58} className="mt-3" />
-  </Card>
+<div style={{ '--phase': '#a855f7' }} className="border-line border-b py-4">
+  <div className="flex items-baseline gap-3">
+    <span className="h-2 w-2 rounded-full" style={{ background: 'var(--phase)' }} />
+    <p className="font-display text-ink font-bold">Uczenie nadzorowane</p>
+    <span className="text-ink-faint tabular ml-auto text-sm">3 z 6</span>
+  </div>
+  <ProgressBar pct={58} className="mt-3" />
 </div>
 ```
 
@@ -99,16 +112,32 @@ w `<Nazwa>.prompt.md`.
 
 ## Przykład
 
+Lista faz w idiomie „osi" — kreska zamiast karty, kolor jako krawędź:
+
 ```jsx
 <DesignPreviewProvider>
-  <div className="mx-auto max-w-5xl space-y-6">
-    <SessionHero plan={plan} />
-    <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <StatCard label="Postęp roadmapy" value="41%" sublabel="23 z 56 zadań"
-                pct={41} color="var(--color-info)" icon={Target} />
-      <StatCard label="Do powtórki" value={3} sublabel="48 fiszek w rotacji"
-                color="var(--color-info)" icon={Layers} />
-    </section>
+  <div className="mx-auto w-full max-w-[45rem] px-6 py-10">
+    <h1 className="font-display text-ink mb-8 text-2xl font-extrabold">Mapa</h1>
+    {[
+      { code: '0', name: 'Python odświeżenie', color: '#22d3ee', done: 4, all: 4 },
+      { code: '1', name: 'Matematyka stosowana', color: '#6366f1', done: 1, all: 3 },
+      { code: '2', name: 'Klasyczne ML od zera', color: '#a855f7', done: 0, all: 6 },
+    ].map((phase) => (
+      <div
+        key={phase.code}
+        style={{ '--phase': phase.color }}
+        className="border-line border-l-2 border-b py-4 pl-4"
+      >
+        <div className="flex items-baseline gap-3">
+          <Badge>Faza {phase.code}</Badge>
+          <p className="font-display text-ink font-bold">{phase.name}</p>
+          <span className="text-ink-faint tabular ml-auto text-sm">
+            {phase.done} z {phase.all}
+          </span>
+        </div>
+        <ProgressBar pct={(phase.done / phase.all) * 100} className="mt-3" />
+      </div>
+    ))}
   </div>
 </DesignPreviewProvider>
 ```

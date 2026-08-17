@@ -68,8 +68,9 @@ def bootstrap() -> None:
             logger.warning("content: %s", warning)
         if result.total_added or result.answers_filled:
             logger.info(
-                "content: dodano %s fiszek, %s pytań, %s materiałów; "
+                "content: dodano %s zadań, %s fiszek, %s pytań, %s materiałów; "
                 "uzupełniono %s odpowiedzi",
+                result.tasks_added,
                 result.flashcards_added,
                 result.questions_added,
                 result.resources_added,

@@ -28,6 +28,7 @@ const KIND_LABEL: Record<string, string> = {
   video: 'Wideo',
   docs: 'Dokumentacja',
   article: 'Artykuł',
+  dataset: 'Zbiór danych',
   other: 'Materiał',
 }
 

@@ -1,10 +1,11 @@
 import { motion } from 'motion/react'
 import { useRef, useState, type ReactNode, type RefObject } from 'react'
 
-import type { Flashcard, QuestionWithStats } from '@/api/types'
+import type { Briefing, Flashcard, QuestionWithStats } from '@/api/types'
 import { Badge, Kbd } from '@/components/ui/primitives'
 import { cn } from '@/lib/cn'
 import { intervalDays, nextBox, promotionLabel, whenLabel } from '@/lib/leitner'
+import { hostOf, kindLabel, STATUS_MARK } from '@/lib/resources'
 import { XP } from '@/lib/session-machine'
 import { Prose } from '@/lib/prose'
 
@@ -25,6 +26,117 @@ export function Prompt({ children }: { children: ReactNode }) {
     <p className="font-display text-ink mt-3.5 text-[1.65rem] leading-snug font-bold tracking-tight text-pretty md:text-[2.1rem]">
       {children}
     </p>
+  )
+}
+
+/* ── Odprawa ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Pierwszy ekran wieczoru: co dziś robisz, z czego i który to punkt fazy.
+ *
+ * Zadanie jest bohaterem, materiały przypisem — i to jest cała hierarchia tego
+ * ekranu. Zadanie roadmapy zajmuje wieczór, więc nie da się go „zrobić w sesji":
+ * ten krok tylko je zapowiada, a odhaczasz je na Mapie, po faktycznej robocie.
+ * Dlatego nie ma tu przycisku „zrobione" i nie leci stąd ani jedno żądanie.
+ *
+ * Największym blokiem tekstu jest notatka z „Gotowe, gdy" — jedyne zdanie,
+ * które mówi, czy wieczór się udał. Bez niej ekran zdegradowałby się do listy
+ * linków, przez którą uczysz się przeklikiwać.
+ */
+export function BriefingStage({
+  briefing,
+  onNext,
+}: {
+  briefing: Briefing
+  onNext: () => void
+}) {
+  const { task, materials, done, total } = briefing
+
+  return (
+    <StageLayout
+      body={
+        <>
+          <div className="flex items-center gap-3">
+            <Label>Dziś robisz</Label>
+            <span className="bg-line h-px flex-1" />
+            <span className="shrink-0 text-[0.72rem] text-[var(--phase)]">
+              {task.phase_name}
+            </span>
+          </div>
+          <Prompt>{task.title}</Prompt>
+
+          <div className="bg-line-strong my-7 h-px" />
+
+          {task.notes.trim() ? (
+            <Prose text={task.notes} className="text-ink-muted text-[1.05rem]" />
+          ) : (
+            /* Degradacja ma być widoczna, nie cicha: puste miejsce wygląda jak
+               usterka, a to brak treści w content/tasks/. */
+            <p className="text-ink-faint text-[0.95rem]">
+              Opis tego zadania nie jest jeszcze napisany — dopisz go w{' '}
+              <code className="font-mono text-[0.88rem]">content/tasks/</code>.
+            </p>
+          )}
+
+          {materials.length > 0 && (
+            <div className="mt-9">
+              <div className="flex items-center gap-3 pb-1">
+                <Label>Skąd to wziąć</Label>
+                <span className="bg-line h-px flex-1" />
+              </div>
+              <ul>
+                {materials.map((material) => (
+                  <li
+                    key={material.id}
+                    className="border-line flex items-baseline gap-3 border-b py-2.5 last:border-b-0"
+                  >
+                    <span className="text-ink-faint w-3 shrink-0 text-center">
+                      {STATUS_MARK[material.status]}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="text-ink text-[0.92rem]">{material.title}</span>
+                      <Badge className="ml-2.5 align-middle">
+                        {kindLabel(material.kind)}
+                      </Badge>
+                    </span>
+                    {material.url && (
+                      <a
+                        href={material.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-ink-faint hover:text-ink shrink-0 text-[0.72rem] transition-colors"
+                      >
+                        {hostOf(material.url)} ↗
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
+      }
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          {/* Jawna konsekwencja: ten ekran niczego nie odhacza i trzeba
+              powiedzieć to wprost, żeby „dalej" nie czytało się jak „zrobione". */}
+          <div className="text-ink-faint flex min-w-0 items-center gap-3.5 text-[0.72rem]">
+            <span>Odhaczysz na Mapie, gdy skończysz</span>
+            <span className="bg-line-strong h-3 w-px" />
+            <span className="tabular">
+              zadanie {done + 1} z {total}
+            </span>
+          </div>
+          <button
+            onClick={onNext}
+            className="rounded-control font-display text-ink flex items-center gap-3 border border-[color-mix(in_oklab,var(--phase)_45%,transparent)] bg-[color-mix(in_oklab,var(--phase)_14%,transparent)] px-5 py-3 text-[0.88rem] font-bold transition hover:-translate-y-px hover:bg-[color-mix(in_oklab,var(--phase)_26%,transparent)]"
+          >
+            <span>Wiem, co robić</span>
+            <Kbd>Enter</Kbd>
+          </button>
+        </div>
+      }
+    />
   )
 }
 
@@ -331,6 +443,7 @@ export function QuizStage({
   position,
   onAnswer,
   onNext,
+  onDefer,
 }: {
   question: QuestionWithStats
   position: { index: number; total: number }
@@ -338,6 +451,8 @@ export function QuizStage({
   onAnswer: (solo: boolean) => void
   /** Przejście dalej — niesie ten sam wybór, żeby wynik sesji się zgadzał. */
   onNext: (solo: boolean) => void
+  /** „Jeszcze nie umiem" — odkłada pytanie, nie zapisuje podejścia. */
+  onDefer: () => void
 }) {
   const [choice, setChoice] = useState<boolean | null>(null)
   const answer = question.answer.trim()
@@ -399,25 +514,38 @@ export function QuizStage({
       }
       footer={
         choice === null ? (
-          <div className="grid grid-cols-2 gap-3">
-            <GradeTile
-              tone="neutral"
-              label="Musiałem sprawdzić"
-              hint={
-                answer
-                  ? '5 XP · odsłania odpowiedź'
-                  : '5 XP · brak wzorcowej odpowiedzi'
-              }
-              shortcut="1"
-              onClick={() => choose(false)}
-            />
-            <GradeTile
-              tone="success"
-              label="Rozwiązałem samodzielnie"
-              hint="5 XP + 3 XP za samodzielność"
-              shortcut="2"
-              onClick={() => choose(true)}
-            />
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <GradeTile
+                tone="neutral"
+                label="Musiałem sprawdzić"
+                hint={
+                  answer
+                    ? '5 XP · odsłania odpowiedź'
+                    : '5 XP · brak wzorcowej odpowiedzi'
+                }
+                shortcut="1"
+                onClick={() => choose(false)}
+              />
+              <GradeTile
+                tone="success"
+                label="Rozwiązałem samodzielnie"
+                hint="5 XP + 3 XP za samodzielność"
+                shortcut="2"
+                onClick={() => choose(true)}
+              />
+            </div>
+            {/* Trzecie wyjście, celowo słabiej wyeksponowane: to nie jest
+                odpowiedź, tylko przyznanie, że pytanie trafiło za wcześnie.
+                Nie zapisuje podejścia, więc wskaźnik samodzielności zostaje
+                uczciwy — ale nie płaci XP, żeby nie opłacało się go nadużywać. */}
+            <button
+              onClick={onDefer}
+              className="text-ink-faint hover:text-ink-muted flex items-center justify-center gap-2.5 py-1 text-[0.78rem] transition-colors"
+            >
+              <span>Jeszcze nie umiem — odłóż na kilka dni</span>
+              <Kbd>3</Kbd>
+            </button>
           </div>
         ) : (
           <motion.div

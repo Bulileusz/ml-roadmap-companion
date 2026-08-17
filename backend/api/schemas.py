@@ -33,7 +33,7 @@ FreeText = Annotated[str, StringConstraints(strip_whitespace=True, max_length=20
 
 QuestionType = Literal["concept", "code"]
 ResourceStatus = Literal["todo", "in_progress", "done"]
-ResourceKind = Literal["book", "course", "video", "docs", "article", "other"]
+ResourceKind = Literal["book", "course", "video", "docs", "article", "dataset", "other"]
 
 
 def _assert_matches(name: str, literal: object, source: tuple[str, ...]) -> None:
@@ -248,6 +248,10 @@ class NextTask(BaseModel):
     phase_id: int
     title: str
     phase_name: str
+    # "Co zrobić" i "Gotowe, gdy" - jedyne zdanie, które mówi, czy wieczór się
+    # udał. Kolumna jedzie w wierszu z `first_incomplete` od zawsze; do PR-a
+    # z odprawą odcinał ją tylko response_model.
+    notes: str
 
 
 class BoxCount(BaseModel):
@@ -317,13 +321,40 @@ class DayNoteUpdate(BaseModel):
     note: FreeText
 
 
+class Briefing(BaseModel):
+    """Pierwszy krok sesji: co dziś robisz, z czego i który to punkt fazy.
+
+    Jeden zagnieżdżony obiekt zamiast trzech luźnych pól, bo front podejmuje
+    jedną decyzję ("jest odprawa albo jej nie ma") zamiast korelować zadanie
+    z listą materiałów i licznikiem.
+    """
+
+    task: NextTask
+    materials: list[Resource]
+    done: int
+    total: int
+
+
+class QuestionsGate(BaseModel):
+    """Czemu w tej sesji nie ma pytań: ile fiszek fazy poznanych, ile trzeba."""
+
+    learned: int
+    needed: int
+
+
 class SessionPlan(BaseModel):
+    # None, gdy cała roadmapa jest odhaczona - wtedy sesja zaczyna się od
+    # powtórek, tak jak przed tym PR-em.
+    briefing: Briefing | None
     intro: list[Flashcard]
     reviews: list[Flashcard]
     reviews_remaining: int
     # Ze statystykami, bo sesja pokazuje wskaźnik samodzielności PRZED
     # odpowiedzią - to informacja o tym, czy z tym pytaniem masz historię.
     questions: list[QuestionWithStats]
+    # None = pytania odblokowane. Nie-None mówi, ile brakuje - brak pytań bez
+    # powodu wygląda jak usterka, a to jest decyzja.
+    questions_gate: QuestionsGate | None
     phase: Phase | None
     next_task: NextTask | None
     total_steps: int
@@ -340,6 +371,7 @@ class ContentSyncResult(BaseModel):
     flashcards_added: int
     questions_added: int
     resources_added: int
+    tasks_added: int
     answers_filled: int
     skipped: int
     warnings: list[str]

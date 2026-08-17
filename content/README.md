@@ -1,8 +1,8 @@
 # Materiały do nauki
 
-Ten katalog to **źródło prawdy dla treści**: fiszki i pytania trzymane
-w gicie, a nie tylko w lokalnym `data/roadmap.db` (który jest nieśledzony,
-więc istnieje w jednej kopii i ginie razem z dyskiem).
+Ten katalog to **źródło prawdy dla treści**: zadania roadmapy, fiszki, pytania
+i materiały trzymane w gicie, a nie tylko w lokalnym `data/roadmap.db` (który
+jest nieśledzony, więc istnieje w jednej kopii i ginie razem z dyskiem).
 
 Aplikacja wczytuje ten katalog **przy każdym starcie**. Dopisujesz fiszkę
 do pliku — choćby z telefonu, przez webowy edytor GitHuba — i przy
@@ -25,6 +25,36 @@ Duże k → granica gładka, model uśrednia zbyt szeroko.
 ```
 
 Tył może mieć wiele akapitów, listy i kod — cokolwiek do następnego `##`.
+
+### Zadania roadmapy — `content/tasks/`
+
+Nagłówek `##` to **tytuł zadania**, tekst pod spodem trafia do notatki — i to
+w niej siedzi cała wartość:
+
+```markdown
+## Przećwicz regułę broadcastingu na własnych przykładach
+Przeczytaj „NumPy: broadcasting" i wymyśl pięć par kształtów — trzy, które się
+złożą, i dwie, które wywalą się z błędem. Zapisz je w skrypcie.
+Gotowe, gdy przewidujesz wynik przed uruchomieniem i trafiasz 5/5.
+```
+
+Zasady, które warto trzymać, bo od nich zależy, czy roadmapa działa:
+
+- **Jedno zadanie to jeden wieczór** (60–90 min). Jeśli coś zajmie trzy
+  wieczory, to są trzy zadania. Zadania-tematy („Pandas: groupby") sprawiają,
+  że Mapa stoi tygodniami i nie ma czego odhaczać.
+- **Ostatnie zdanie zaczyna się od „Gotowe, gdy"** i podaje sprawdzalny efekt.
+  „Rozumiesz X" jest złe; „skrypt wypisuje Y" jest dobre.
+- Kolejność w pliku jest kolejnością nauki — import zachowuje ją jako
+  `order_index`, a od pierwszego niezrobionego zadania zależy, w której fazie
+  aplikacja uważa, że jesteś.
+
+Zadanie bez opisu wjedzie, ale zostanie zgłoszone w ostrzeżeniach importu:
+sam tytuł nie mówi, co zrobić ani kiedy przestać.
+
+Roadmapa była kiedyś jedyną treścią spoza tego katalogu — siedziała w
+`backend/db/seed_data.py` i wjeżdżała wyłącznie na pustą bazę, więc zmiana
+planu nauki wymagała ręcznego SQL-a. Teraz podlega tym samym regułom, co reszta.
 
 ### Pytania — `content/questions/`
 

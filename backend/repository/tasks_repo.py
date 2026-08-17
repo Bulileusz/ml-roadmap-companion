@@ -14,15 +14,16 @@ def get(conn: sqlite3.Connection, task_id: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
 
 
-def create(conn: sqlite3.Connection, phase_id: int, title: str) -> int:
+def create(conn: sqlite3.Connection, phase_id: int, title: str, notes: str = "") -> int:
     # Pojedynczy INSERT...SELECT zamiast SELECT MAX + INSERT: atomowe
     # wyznaczenie order_index na współdzielonym połączeniu.
     now = clock.now_iso()
     cursor = conn.execute(
-        "INSERT INTO tasks (phase_id, title, order_index, created_at, updated_at) "
-        "SELECT ?, ?, COALESCE(MAX(order_index), -1) + 1, ?, ? "
+        "INSERT INTO tasks "
+        "(phase_id, title, notes, order_index, created_at, updated_at) "
+        "SELECT ?, ?, ?, COALESCE(MAX(order_index), -1) + 1, ?, ? "
         "FROM tasks WHERE phase_id = ?",
-        (phase_id, title, now, now, phase_id),
+        (phase_id, title, notes, now, now, phase_id),
     )
     conn.commit()
     return cursor.lastrowid

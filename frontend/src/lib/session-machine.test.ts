@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Flashcard, QuestionWithStats, SessionPlan } from '@/api/types'
+import type { Briefing, Flashcard, QuestionWithStats, SessionPlan } from '@/api/types'
 
 import {
   boxOf,
@@ -41,8 +41,26 @@ function question(id: number): QuestionWithStats {
   }
 }
 
+function briefing(over: Partial<Briefing> = {}): Briefing {
+  return {
+    task: {
+      id: 7,
+      phase_id: 1,
+      title: 'Granice decyzyjne',
+      phase_name: 'Faza 2 - Klasyczne ML',
+      notes: 'Porównaj cztery modele.\nGotowe, gdy masz jeden wykres.',
+    },
+    materials: [],
+    done: 2,
+    total: 6,
+    ...over,
+  }
+}
+
 function plan(over: Partial<SessionPlan> = {}): SessionPlan {
   return {
+    briefing: null,
+    questions_gate: null,
     intro: [],
     reviews: [],
     reviews_remaining: 0,
@@ -86,6 +104,91 @@ describe('initSession', () => {
     const state = initSession(plan({ reviews: [card(2, 4)] }))
 
     expect(boxOf(state, card(2, 4))).toBe(4)
+  })
+})
+
+describe('odprawa', () => {
+  it('otwiera kolejkę, przed powtórkami', () => {
+    const state = initSession(
+      plan({
+        briefing: briefing(),
+        intro: [card(1, 1, false)],
+        reviews: [card(2, 3)],
+        questions: [question(9)],
+      }),
+    )
+
+    // Zapowiedź wieczoru musi paść, zanim wsiąkniesz w karty.
+    expect(state.queue.map((s) => s.kind)).toEqual([
+      'briefing',
+      'review',
+      'intro',
+      'question',
+    ])
+  })
+
+  it('bez zadania w planie nie ma odprawy', () => {
+    const state = initSession(plan({ reviews: [card(2, 3)] }))
+
+    expect(state.queue.map((s) => s.kind)).toEqual(['review'])
+  })
+
+  it('„wiem, co robić" przesuwa dalej', () => {
+    const state = initSession(plan({ briefing: briefing(), reviews: [card(2, 3)] }))
+
+    const after = run(state, { type: 'briefed' })
+
+    expect(currentStep(after)?.kind).toBe('review')
+  })
+
+  it('sama odprawa domyka sesję', () => {
+    const state = initSession(plan({ briefing: briefing() }))
+
+    expect(run(state, { type: 'briefed' }).done).toBe(true)
+  })
+
+  it('„briefed" na innym kroku nie robi nic', () => {
+    const state = initSession(plan({ reviews: [card(2, 3)] }))
+
+    expect(sessionReducer(state, { type: 'briefed' })).toBe(state)
+  })
+
+  it('nie wnosi nic do rachunku XP', () => {
+    const withBrief = summarize(
+      run(initSession(plan({ briefing: briefing() })), { type: 'briefed' }),
+    )
+
+    // Odprawa niczego nie zapisuje, więc nie ma czego policzyć. Zadanie
+    // roadmapy płaci dopiero przy odhaczeniu na Mapie.
+    expect(withBrief.xpTotal).toBe(0)
+    expect(withBrief.reviewed).toBe(0)
+  })
+})
+
+describe('odroczone pytanie', () => {
+  const start = () => initSession(plan({ questions: [question(9), question(10)] }))
+
+  it('przesuwa do następnego pytania', () => {
+    const after = run(start(), { type: 'deferred' })
+
+    expect(currentStep(after)?.key).toBe('question-10')
+  })
+
+  it('nie liczy się jako odpowiedź ani do XP', () => {
+    const summary = summarize(run(start(), { type: 'deferred' }, { type: 'deferred' }))
+
+    // „Jeszcze nie umiem" to sygnał „za wcześnie", nie podejście — inaczej
+    // wskaźnik samodzielności mierzyłby, ile razy trafiłeś na pytanie za
+    // wcześnie, zamiast tego, jak często radzisz sobie sam.
+    expect(summary.answered).toBe(0)
+    expect(summary.solo).toBe(0)
+    expect(summary.xpTotal).toBe(0)
+  })
+
+  it('„deferred" poza pytaniem nie robi nic', () => {
+    const state = initSession(plan({ reviews: [card(2, 3)] }))
+
+    expect(sessionReducer(state, { type: 'deferred' })).toBe(state)
   })
 })
 

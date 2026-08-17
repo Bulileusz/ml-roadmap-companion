@@ -93,3 +93,18 @@ def create_attempt(question_id: int, payload: schemas.AttemptCreate, conn: DbCon
         "total": total,
         "pct": progress.phase_progress_pct(independent, total),
     }
+
+
+@router.post("/{question_id}/defer", status_code=status.HTTP_204_NO_CONTENT)
+def defer_question(question_id: int, conn: DbConn):
+    """„Jeszcze nie umiem" - pytanie wraca za kilka dni, podejście się nie zapisuje.
+
+    Osobny endpoint, a nie podejście z solved_independently=false, bo to nie
+    jest próba. Gdyby odroczenie liczyło się jako nieudane podejście, wskaźnik
+    samodzielności mierzyłby, ile razy trafiłeś na pytanie za wcześnie - a ma
+    mierzyć, jak często radzisz sobie sam. Stąd też brak odpowiedzi ze
+    statystyką: po tym kliknięciu nie ma czego odświeżać.
+    """
+    question = found(questions_repo.get(conn, question_id), f"pytanie {question_id}")
+    activity.record_question_deferred(conn, question)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

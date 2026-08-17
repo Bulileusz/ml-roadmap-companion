@@ -43,8 +43,18 @@ def get_today(conn: DbConn):
             }
         )
 
+    brief = plan["briefing"]
     return {
         **plan,
+        "briefing": (
+            None
+            if brief is None
+            else {
+                **brief,
+                "task": as_dict(brief["task"]),
+                "materials": as_dicts(brief["materials"]),
+            }
+        ),
         "intro": as_dicts(plan["intro"]),
         "reviews": as_dicts(plan["reviews"]),
         "questions": questions,

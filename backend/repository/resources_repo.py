@@ -10,7 +10,10 @@ STATUSES = (STATUS_TODO, STATUS_IN_PROGRESS, STATUS_DONE)
 # Rodzaje materiału. Bez CHECK w schemacie - lista rośnie szybciej niż
 # migracje, a wpisanie nieznanego rodzaju ma degradować UI do ikony
 # domyślnej, a nie wywalać zapis.
-KINDS = ("book", "course", "video", "docs", "article", "other")
+# "dataset" doszedł z fazą projektową: zbiór danych nie jest ani dokumentacją,
+# ani artykułem - z materiału do przeczytania robi się materiał do pobrania,
+# a to inna decyzja („czy mam miejsce na dysku") i inny sposób odhaczenia.
+KINDS = ("book", "course", "video", "docs", "article", "dataset", "other")
 DEFAULT_KIND = "other"
 
 
@@ -18,6 +21,30 @@ def list_by_phase(conn: sqlite3.Connection, phase_id: int) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM resources WHERE phase_id = ? ORDER BY order_index, id",
         (phase_id,),
+    ).fetchall()
+
+
+def list_for_session(
+    conn: sqlite3.Connection, phase_id: int, limit: int
+) -> list[sqlite3.Row]:
+    """Materiały na odprawę: z czego uczyć się dziś w tej fazie.
+
+    Zaczęte przed nietkniętymi - materiał raz otwarty ma zostać domknięty,
+    zanim otworzysz trzecią książkę. To jedyny sygnał ciągłości, jaki ta tabela
+    niesie. Dalej kolejność z pliku (`order_index`), bo w content/resources
+    jest ona zamierzoną kolejnością czytania: NumPy basics przed
+    broadcastingiem. Losowanie regularnie stawiałoby referencję `torch.nn`
+    przed "Learn the Basics".
+
+    Przerobione odpadają w SQL, nie na froncie: sesja pyta "z czego mam się dziś
+    uczyć", a nie "co jest w fazie".
+    """
+    return conn.execute(
+        "SELECT * FROM resources "
+        "WHERE phase_id = ? AND status != ? "
+        "ORDER BY CASE status WHEN ? THEN 0 ELSE 1 END, order_index, id "
+        "LIMIT ?",
+        (phase_id, STATUS_DONE, STATUS_IN_PROGRESS, limit),
     ).fetchall()
 
 
